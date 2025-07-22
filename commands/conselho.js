@@ -20,7 +20,7 @@ Exemplos de tom:
 - "Se a balada tá fraca, seja a balada! 🔥"
 - "Nunca confie em quem diz que vai sair 'só uma rapidinha' e volta às 6h da manhã."
 - "Se for pra ter arrependimentos, que sejam dos bons e com ótimas histórias pra contar."
-O conselho deve ter no máximo 2 frases.`;
+O conselho deve ter no máximo 2 frases.`; //qui beleza
             
         conselhoGerado = await gerarConteudoComGemini(prompt);
         

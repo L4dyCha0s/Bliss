@@ -8,7 +8,7 @@ module.exports = async (client, msg) => {
 ❖ Idade:
 ❖ Região de SP:
 ❖ Uma curiosidade sobre você:
-❖ Instagram:`;
+❖ Instagram:`; //nao 
 
   await msg.reply(ficha);
 };

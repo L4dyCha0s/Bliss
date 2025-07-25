@@ -19,7 +19,7 @@ Para falar comigo use !bliss. (Sou uma IA para interações leves)
 *!jogodomatch*
 *!maisprovavel*
 
-🪄Utilitários:
+🪄Utilitários (funciona no pv):
 
 *!d6*
 *!d20*

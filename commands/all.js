@@ -1,47 +1,57 @@
 module.exports = async (client, msg, args = []) => {
-  const chat = await msg.getChat();
+    const chat = await msg.getChat();
 
-  // Verifica se está em um grupo
-  if (!chat.isGroup) {
-    await msg.reply('❌ Este comando só pode ser usado em grupos.');
-    return;
-  }
+    // Verifica se está em um grupo
+    if (!chat.isGroup) {
+        await msg.reply('❌ Este comando só pode ser usado em grupos.');
+        return;
+    }
 
-  // Verifica se quem enviou é admin
-  const isAdmin = chat.participants.some(p =>
-    (msg.author || msg.from) === p.id._serialized && p.isAdmin
-  );
+    // Verifica se quem enviou é admin
+    const isAdmin = chat.participants.some(p =>
+        (msg.author || msg.from) === p.id._serialized && p.isAdmin
+    );
 
-  if (!isAdmin) {
-    await msg.reply('❌ Apenas administradores podem usar este comando.');
-    return;
-  }
+    if (!isAdmin) {
+        await msg.reply('❌ Apenas administradores podem usar este comando.');
+        return;
+    }
 
-  // Coleta todos os membros (exceto o próprio bot)
-  const mentions = [];
-  for (const participant of chat.participants) {
-    const contact = await client.getContactById(participant.id._serialized);
-    if (contact.id._serialized === client.info.wid._serialized) continue;
-    mentions.push(contact);
-  }
+    // Coleta todos os membros (exceto o próprio bot)
+    const mentions = [];
+    for (const participant of chat.participants) {
+        const contact = await client.getContactById(participant.id._serialized);
+        if (contact.id._serialized === client.info.wid._serialized) continue; // Pula o próprio bot
+        mentions.push(contact);
+    }
 
-  if (mentions.length === 0) {
-    await msg.reply('❌ Não há membros para mencionar.');
-    return;
-  }
+    if (mentions.length === 0) {
+        await msg.reply('❌ Não há membros para mencionar.');
+        return;
+    }
 
-  // Texto personalizado do usuário
-  const textoPersonalizado = args.length > 0
-    ? args.join(' ')
-    : '🎉🎉🎉 *ATENÇÃO* 🎉🎉🎉 \n\nVocê acaba de *GANHAR* um reluzente *Fiat Uno 2005* com *ESCADA!* no nosso sorteio exclusivo! \nParabéns! 🚗💨 \nFique ligado para mais novidades e sorteios incríveis! \n\nÉ mentira, ganhou nada, sou mitomaniaca e precisava chamar a atenção de todos. Agora vejam a mensagem que eu respondi acima.';
+    let mensagemFinal = '';
+    let idMensagemCitada = null;
 
-  // Mensagem final, estilo @everyone
-  const mensagemFinal = `${textoPersonalizado}\n\n🔔 *@everyone*`;
+    // NOVO: Lógica ajustada para a mensagem padrão
+    if (msg.hasQuotedMsg) {
+        const quotedMsg = await msg.getQuotedMessage();
+        mensagemFinal = `${quotedMsg.body}\n\n🔔 *@everyone*`;
+        idMensagemCitada = quotedMsg.id._serialized; // Pega o ID da mensagem citada para responder a ela
+    } else if (args.length > 0) {
+        // Se não citou, mas passou argumentos, usa os argumentos
+        mensagemFinal = `${args.join(' ')}\n\n🔔 *@everyone*`;
+        idMensagemCitada = null; // Não há mensagem citada para responder
+    } else {
+        // Se não citou e não passou argumentos, usa a nova mensagem padrão
+        mensagemFinal = '❇️*@everyone* ❇️';
+        idMensagemCitada = null; // Não há mensagem citada para responder
+    }
 
-  // Envia mencionando todos, mas sem mostrar os @
-  await chat.sendMessage(mensagemFinal, {
-    mentions,
-    quotedMessageId: msg.id._serialized
-  });
+    // Envia mencionando todos e respondendo à mensagem original (se houver)
+    await chat.sendMessage(mensagemFinal, {
+        mentions: mentions,
+        quotedMessageId: idMensagemCitada // Reenvia citando a mensagem original
+    });
 };
 

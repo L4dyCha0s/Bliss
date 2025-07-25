@@ -1,6 +1,5 @@
-// Este arquivo gerencia o estado global dos jogos.
-// Se o seu bot for reiniciado, este estado será perdido.
-// Para persistência, você precisaria de um banco de dados ou salvar em um arquivo.
+// Este arquivo gerencia o estado global dos jogos e de outras funcionalidades.
+// Se o seu bot for reiniciado, este estado será perdido, a menos que seja salvo em algum lugar.
 
 let jogoDoMatchState = {
     isActive: false, // Indica se uma rodada do Jogo do Match está ativa
@@ -27,6 +26,23 @@ let maisProvavelState = {
     voteTimeout: null, // Timeout para o período de votação
 };
 
+// --- NOVOS ESTADOS E CONSTANTES PARA O SISTEMA DE BLOQUEIO E ANTI-SPAM ---
+
+// Objeto para rastrear usuários bloqueados manualmente temporariamente
+// Formato: { userId: timestamp_até_o_bloqueio_expirar }
+const tempBlockedUsers = {}; 
+
+// Objeto para rastrear o uso de comandos por usuário (para anti-spam automático)
+// Formato: { userId: { lastCommandTime: timestamp, commandCount: number, blockedUntil: timestamp, spamWarningSent: boolean } }
+const spamTracker = {}; 
+
+// Constantes para controle de SPAM automático
+const SPAM_MAX_COMMANDS = 5; // Número máximo de comandos permitidos
+const SPAM_TIME_WINDOW = 10 * 1000; // Dentro de 10 segundos (em milissegundos)
+const SPAM_BLOCK_DURATION = 60 * 1000; // Bloquear por 60 segundos (em milissegundos) se o limite for atingido
+
+// --- FIM DOS NOVOS ESTADOS E CONSTANTES ---
+
 
 const TIMEOUT_DURATION_MATCH = 5 * 60 * 1000; // 5 minutos para o Jogo do Match
 const TIMEOUT_DURATION_VOD = 3 * 60 * 1000; // 3 minutos para Verdade ou Desafio
@@ -39,4 +55,11 @@ module.exports = {
     TIMEOUT_DURATION_MATCH,
     TIMEOUT_DURATION_VOD,
     TIMEOUT_DURATION_MAIS_PROVAVEL, // Exporta o novo timeout
+
+    // NOVO: Exporta as variáveis do sistema de bloqueio e anti-spam
+    tempBlockedUsers,
+    spamTracker,
+    SPAM_MAX_COMMANDS,
+    SPAM_TIME_WINDOW,
+    SPAM_BLOCK_DURATION,
 };

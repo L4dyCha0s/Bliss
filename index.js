@@ -4,9 +4,26 @@ const path = require('path');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 // ALTERAÇÃO AQUI: ADIÇÃO de maisProvavelState ao import do gameState
-const { jogoDoMatchState, verdadeOuDesafioState, maisProvavelState } = require('./gameState'); // Ajuste o caminho se gameState.js não estiver na raiz
+const { 
+    jogoDoMatchState, 
+    verdadeOuDesafioState, 
+    maisProvavelState,
+    // NOVO: Adições para bloqueio e spam
+    spamTracker,
+    SPAM_MAX_COMMANDS,
+    SPAM_TIME_WINDOW,
+    SPAM_BLOCK_DURATION,
+    tempBlockedUsers // Importa o rastreador de bloqueios temporários
+} = require('./gameState'); // Ajuste o caminho se gameState.js não estiver na raiz
 
 // --- Fim das Importações de Módulos ---
+
+// --- NOVO: Definição do ID do Administrador do Bot ---
+// *** ATENÇÃO: SUBSTITUA 'SEU_NUMERO_DE_WHATSAPP@c.us' PELO SEU PRÓPRIO ID ***
+// Exemplo: '5511999999999@c.us'
+const ownerId = '5518997572004@c.us'; 
+// --- Fim da Definição do ID do Administrador ---
+
 
 // --- Funções Auxiliares para JSON (EXISTENTES) ---
 function carregarJson(filePath) {
@@ -30,6 +47,8 @@ function salvarJson(filePath, data) {
 const arquivoTempo = path.join(__dirname, 'data', 'tempo.json');
 const arquivoRanking = path.join(__dirname, 'data', 'ranking.json');
 const arquivoFrasesPersonalizadas = path.join(__dirname, 'data', 'frasesPersonalizadas.json');
+// NOVO: Caminho para o arquivo de usuários bloqueados permanentemente
+const arquivoBlockedUsers = path.join(__dirname, 'data', 'blockedUsers.json');
 // --- Fim dos Caminhos dos Arquivos de Dados ---
 
 // Cria o cliente do bot com autenticação local
@@ -103,11 +122,100 @@ client.on('message', async (msg) => {
     // Apenas ignora mensagens do próprio bot
     if (msg.fromMe) return;
 
+    const autorId = msg.author || msg.from;
+    let autorContact;
+    try {
+        autorContact = await client.getContactById(autorId);
+    } catch (e) {
+        console.error('Erro ao obter contato do autor:', e);
+        autorContact = { pushname: 'Usuário', verifiedName: 'Usuário', name: 'Usuário', id: { user: autorId.split('@')[0] } };
+    }
+
+    const now = Date.now(); // Tempo atual em milissegundos
+
+    // --- NOVO: 1. Verificação de Bloqueio Manual Temporário (PRIORIDADE ALTA) ---
+    if (tempBlockedUsers[autorId] && tempBlockedUsers[autorId] > now) {
+        console.log(`Usuário ${autorId} está bloqueado manualmente temporariamente.`);
+        // Opcional: pode adicionar uma flag para enviar o aviso apenas uma vez a cada bloqueio
+        await msg.reply(`⚠️ ${autorContact.pushname || autorContact.verifiedName || autorContact.name}, você está temporariamente bloqueado(a) de usar o bot por decisão de um administrador. Por favor, aguarde.`, null, { mentions: [autorContact] });
+        return; // Ignora a mensagem
+    } else if (tempBlockedUsers[autorId] && tempBlockedUsers[autorId] <= now) {
+        // Se o tempo de bloqueio expirou, remove o usuário da lista
+        delete tempBlockedUsers[autorId];
+        console.log(`Bloqueio temporário de ${autorId} expirou.`);
+    }
+    // --- FIM DA VERIFICAÇÃO DE BLOQUEIO MANUAL TEMPORÁRIO ---
+
+    // --- NOVO: 2. Verificação de Bloqueio Permanente (ALTA PRIORIDADE) ---
+    let blockedUsers = [];
+    try {
+        if (fs.existsSync(arquivoBlockedUsers)) {
+            blockedUsers = JSON.parse(fs.readFileSync(arquivoBlockedUsers, 'utf8'));
+        }
+    } catch (e) {
+        console.error('Erro ao carregar blockedUsers.json para verificação:', e);
+        // Em caso de erro, assume lista vazia para não bloquear indevidamente
+        blockedUsers = []; 
+    }
+
+    if (blockedUsers.includes(autorId)) {
+        console.log(`Usuário ${autorId} está bloqueado permanentemente. Ignorando.`);
+        return; // Ignora a mensagem
+    }
+    // --- FIM DA VERIFICAÇÃO DE BLOQUEIO PERMANENTE ---
+
+    // --- NOVO: 3. Verificação de SPAM (Automática) ---
+    // Apenas rastrear mensagens que parecem ser comandos (começam com '!')
+    const isCommand = msg.body.trim().startsWith('!');
+    
+    // Inicializa o rastreador para o usuário se não existir
+    if (!spamTracker[autorId]) {
+        spamTracker[autorId] = {
+            lastCommandTime: now,
+            commandCount: 0,
+            blockedUntil: 0,
+            spamWarningSent: false
+        };
+    }
+    const userData = spamTracker[autorId];
+
+    // Verifica se o usuário já está automaticamente bloqueado por spam
+    if (userData.blockedUntil > now) {
+        console.log(`Usuário ${autorId} está temporariamente bloqueado por spam.`);
+        if (!userData.spamWarningSent) {
+             await msg.reply(`⚠️ ${autorContact.pushname || autorContact.verifiedName || autorContact.name}, por favor, não flode! Você está temporariamente bloqueado(a) por ${SPAM_BLOCK_DURATION / 1000} segundos.`, null, { mentions: [autorContact] });
+             userData.spamWarningSent = true;
+        }
+        return;
+    } else {
+        userData.spamWarningSent = false;
+    }
+
+    if (isCommand) {
+        if (now - userData.lastCommandTime > SPAM_TIME_WINDOW) {
+            userData.commandCount = 1;
+            userData.lastCommandTime = now;
+        } else {
+            userData.commandCount++;
+        }
+
+        if (userData.commandCount > SPAM_MAX_COMMANDS) {
+            userData.blockedUntil = now + SPAM_BLOCK_DURATION;
+            userData.commandCount = 0;
+            userData.lastCommandTime = now;
+            userData.spamWarningSent = true;
+            console.log(`Usuário ${autorId} flodou e foi bloqueado por ${SPAM_BLOCK_DURATION / 1000} segundos.`);
+            await msg.reply(`⚠️ ${autorContact.pushname || autorContact.verifiedName || autorContact.name}, por favor, não flode! Você está temporariamente bloqueado(a) por ${SPAM_BLOCK_DURATION / 1000} segundos.`, null, { mentions: [autorContact] });
+            return;
+        }
+    }
+    // --- FIM DA VERIFICAÇÃO DE SPAM ---
+
+
     if (msg.id.remote.endsWith('@g.us')) { // Apenas processa mensagens de grupos
         const chat = await msg.getChat();
         const groupId = chat.id._serialized;
-        const userId = msg.author || msg.from; // Quem enviou a mensagem
-
+        // ... (o resto da lógica de tempo.json, ranking.json, !maisprovavel) ...
         let tempoData = carregarJson(arquivoTempo);
         if (!tempoData[groupId]) {
             tempoData[groupId] = {};
@@ -115,7 +223,6 @@ client.on('message', async (msg) => {
         tempoData[groupId][userId] = Date.now();
         salvarJson(arquivoTempo, tempoData);
 
-        // Somente mensagens de 'chat' contribuem para o ranking de mensagens
         if (msg.type === 'chat') {
             let rankingData = carregarJson(arquivoRanking);
             if (!rankingData[groupId]) {
@@ -125,32 +232,21 @@ client.on('message', async (msg) => {
             salvarJson(arquivoRanking, rankingData);
         }
 
-        // --- INÍCIO DA LÓGICA DO !MAISPROVAVEL (ADICIONADA AQUI) ---
-        // Esta lógica captura menções para votação em qualquer mensagem,
-        // desde que o jogo !maisprovavel esteja ativo no grupo.
         if (maisProvavelState.isActive && maisProvavelState.groupId === groupId && msg.mentionedIds && msg.mentionedIds.length > 0) {
-            const idMencionado = msg.mentionedIds[0]; // Pega a primeira pessoa mencionada
-
-            // Obtém todos os IDs dos participantes do grupo (excluindo o bot)
+            const idMencionado = msg.mentionedIds[0];
             const todosParticipantesIds = chat.participants
                 .filter(p => p.id._serialized !== client.info.wid._serialized)
                 .map(p => p.id._serialized);
 
-            // Verifica se a menção é de um participante válido do grupo e não é o próprio votante
             if (todosParticipantesIds.includes(idMencionado) && idMencionado !== userId) {
                 maisProvavelState.votes[idMencionado] = (maisProvavelState.votes[idMencionado] || 0) + 1;
                 console.log(`[MAIS PROVÁVEL - Voto] ${userId} votou em ${idMencionado}. Votos atuais:`, maisProvavelState.votes);
-                // Opcional: Reagir à mensagem para confirmar o voto (pode gerar muito tráfego em grupos grandes)
-                // await msg.react('✅');
             } else if (idMencionado === userId) {
-                // Mensagem de erro para votação em si mesmo (pode ser omitida para não poluir o chat)
                 console.log(`[MAIS PROVÁVEL - Erro] ${userId} tentou votar em si mesmo.`);
             } else {
-                // Mensagem de erro para menção inválida (pode ser omitida)
                 console.log(`[MAIS PROVÁVEL - Erro] ${userId} mencionou um ID inválido para voto.`);
             }
         }
-        // --- FIM DA LÓGICA DO !MAISPROVAVEL ---
     }
     // --- Fim da Lógica de Atualização para grupos ---
 
@@ -166,10 +262,12 @@ client.on('message', async (msg) => {
         try {
             if (typeof comandoObj === 'function') {
                 // Comando antigo: função simples (ex: !match, !jogodomatch ou !vod ou !maisprovavel)
-                await comandoObj(client, msg); // Passa 'msg' que contém body, mentionedIds, etc.
+                // NOVO: Passando ownerId para comandos que podem precisar
+                await comandoObj(client, msg, args, ownerId); 
             } else if (typeof comandoObj.execute === 'function') {
                 // Comando novo: possui método execute()
-                await comandoObj.execute(client, msg, args); // Mantém a passagem de args caso algum comando execute precise
+                // NOVO: Passando ownerId para comandos que podem precisar
+                await comandoObj.execute(client, msg, args, ownerId); 
             } else {
                 await msg.reply('⚠️ Este comando não está corretamente formatado.');
             }

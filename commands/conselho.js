@@ -15,7 +15,7 @@ function carregarConselhosUsados() {
     } catch (e) {
         console.error('Erro ao carregar conselhos salvos:', e);
     }
-    return [];
+    return []; //0
 }
 
 // Função para salvar um novo conselho no arquivo

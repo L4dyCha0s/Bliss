@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { gerarConteudoComGemini } = require('../servico-gemini'); // Certifique-se do caminho correto
+const { gerarConteudoComGemini } = require('../serviço-gemini'); // Certifique-se do caminho correto
 
 // Caminho do arquivo para salvar os conselhos já usados
 const conselhosUsadosPath = path.join(__dirname, '..', 'data', 'conselhos_usados.json');

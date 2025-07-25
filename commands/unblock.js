@@ -1,25 +1,24 @@
 const fs = require('fs');
 const path = require('path');
-const { tempBlockedUsers } = require('../gameState'); // Importa o rastreador de bloqueios temporários
+const { tempBlockedUsers } = require('../gameState');
 
 const arquivoBlockedUsers = path.join(__dirname, '..', 'data', 'blockedUsers.json');
 
-// Função para salvar a lista de bloqueados permanentes
 function salvarBlockedUsers(lista) {
     fs.writeFileSync(arquivoBlockedUsers, JSON.stringify(lista, null, 2), 'utf8');
 }
 
+// CORRIGIDO: Recebendo ownerId (apenas um admin)
 module.exports = async (client, msg, args, ownerId) => {
     const chat = await msg.getChat();
     const autorId = msg.author || msg.from;
 
-    // Apenas o dono do bot pode usar este comando
+    // VERIFICADO: Usa ownerId para verificar permissão
     if (autorId !== ownerId) {
         msg.reply('❌ Apenas o administrador pode usar este comando.');
         return;
     }
 
-    // O comando precisa de uma menção
     if (msg.mentionedIds.length === 0) {
         msg.reply('⚠️ Você precisa mencionar a pessoa para desbloquear. Ex: `!unblock @pessoa`');
         return;
@@ -46,10 +45,13 @@ module.exports = async (client, msg, args, ownerId) => {
     let blockedUsers = [];
     try {
         if (fs.existsSync(arquivoBlockedUsers)) {
-            blockedUsers = JSON.parse(fs.readFileSync(arquivoBlockedUsers, 'utf8'));
+            // Garante que blockedUsers seja um array
+            const content = fs.readFileSync(arquivoBlockedUsers, 'utf8');
+            blockedUsers = content ? JSON.parse(content) : []; 
         }
     } catch (e) {
         console.error('Erro ao carregar blockedUsers.json para o comando:', e);
+        blockedUsers = [];
     }
 
     const index = blockedUsers.indexOf(idMencionado);

@@ -1,25 +1,24 @@
 const fs = require('fs');
 const path = require('path');
-const { tempBlockedUsers } = require('../gameState'); // Importa o rastreador de bloqueios temporários
+const { tempBlockedUsers } = require('../gameState');
 
 const arquivoBlockedUsers = path.join(__dirname, '..', 'data', 'blockedUsers.json');
 
-// Função para salvar a lista de bloqueados permanentes
 function salvarBlockedUsers(lista) {
     fs.writeFileSync(arquivoBlockedUsers, JSON.stringify(lista, null, 2), 'utf8');
 }
 
+// CORRIGIDO: Recebendo ownerId (apenas um admin)
 module.exports = async (client, msg, args, ownerId) => {
     const chat = await msg.getChat();
     const autorId = msg.author || msg.from;
 
-    // Apenas o dono do bot pode usar este comando
+    // VERIFICADO: Usa ownerId para verificar permissão
     if (autorId !== ownerId) {
         msg.reply('❌ Apenas o administrador pode usar este comando.');
         return;
     }
 
-    // O comando precisa de pelo menos uma menção
     if (msg.mentionedIds.length === 0) {
         msg.reply('⚠️ Você precisa mencionar a pessoa para bloquear. Ex: `!block @pessoa` (permanente) ou `!block @pessoa 15m` (temporário).');
         return;
@@ -35,33 +34,31 @@ module.exports = async (client, msg, args, ownerId) => {
         return;
     }
 
-    // Não bloquear o próprio admin
+    // Não bloquear o próprio admin (ownerId)
     if (idMencionado === ownerId) {
         msg.reply('Você não pode se bloquear!');
         return;
     }
 
-    // Verifica se há um argumento de duração (ex: "15m", "1h")
-    const duracaoArg = args[1]; // O primeiro argumento é a menção, o segundo seria a duração
+    const duracaoArg = args[1];
     let isTemporaryBlock = false;
-    let blockDurationMs = 0; // Duração em milissegundos
+    let blockDurationMs = 0;
 
     if (duracaoArg) {
-        const match = duracaoArg.match(/^(\d+)([mh])$/); // Captura número e unidade (m para minutos, h para horas)
+        const match = duracaoArg.match(/^(\d+)([mh])$/);
         if (match) {
             const value = parseInt(match[1]);
             const unit = match[2];
             if (unit === 'm') {
-                blockDurationMs = value * 60 * 1000; // Minutos para milissegundos
+                blockDurationMs = value * 60 * 1000;
             } else if (unit === 'h') {
-                blockDurationMs = value * 60 * 60 * 1000; // Horas para milissegundos
+                blockDurationMs = value * 60 * 60 * 1000;
             }
             isTemporaryBlock = true;
         }
     }
 
     if (isTemporaryBlock) {
-        // --- BLOQUEIO TEMPORÁRIO ---
         const blockedUntil = Date.now() + blockDurationMs;
         tempBlockedUsers[idMencionado] = blockedUntil;
 
@@ -74,14 +71,16 @@ module.exports = async (client, msg, args, ownerId) => {
         console.log(`Admin ${autorId} bloqueou temporariamente ${idMencionado} por ${duracaoFormatada}.`);
 
     } else {
-        // --- BLOQUEIO PERMANENTE ---
         let blockedUsers = [];
         try {
             if (fs.existsSync(arquivoBlockedUsers)) {
-                blockedUsers = JSON.parse(fs.readFileSync(arquivoBlockedUsers, 'utf8'));
+                // Garante que blockedUsers seja um array
+                const content = fs.readFileSync(arquivoBlockedUsers, 'utf8');
+                blockedUsers = content ? JSON.parse(content) : []; 
             }
         } catch (e) {
             console.error('Erro ao carregar blockedUsers.json para o comando:', e);
+            blockedUsers = [];
         }
         
         if (!blockedUsers.includes(idMencionado)) {

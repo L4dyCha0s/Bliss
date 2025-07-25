@@ -3,24 +3,21 @@ const fs = require('fs');
 const path = require('path');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-// ALTERAÇÃO AQUI: ADIÇÃO de maisProvavelState ao import do gameState
 const { 
     jogoDoMatchState, 
     verdadeOuDesafioState, 
     maisProvavelState,
-    // NOVO: Adições para bloqueio e spam
     spamTracker,
     SPAM_MAX_COMMANDS,
     SPAM_TIME_WINDOW,
     SPAM_BLOCK_DURATION,
-    tempBlockedUsers // Importa o rastreador de bloqueios temporários
-} = require('./gameState'); // Ajuste o caminho se gameState.js não estiver na raiz
+    tempBlockedUsers
+} = require('./gameState'); 
 
 // --- Fim das Importações de Módulos ---
 
-// --- NOVO: Definição do ID do Administrador do Bot ---
-// *** ATENÇÃO: SUBSTITUA 'SEU_NUMERO_DE_WHATSAPP@c.us' PELO SEU PRÓPRIO ID ***
-// Exemplo: '5511999999999@c.us'
+// --- Definição do ID do Administrador do Bot (UM ÚNICO ADMIN) ---
+// **Seu user ID para o bot reconhecer como admin**
 const ownerId = '5518997572004@c.us'; 
 // --- Fim da Definição do ID do Administrador ---
 
@@ -29,13 +26,16 @@ const ownerId = '5518997572004@c.us';
 function carregarJson(filePath) {
     if (fs.existsSync(filePath)) {
         try {
-            return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            // Garante que para arquivos como blockedUsers.json ou admins.json, retorne array vazio
+            // Se for para arquivos de ranking/tempo que esperam um objeto, retorne objeto vazio
+            const content = fs.readFileSync(filePath, 'utf8');
+            return content ? JSON.parse(content) : {}; 
         } catch (e) {
             console.error(`Erro ao ler/parsear ${filePath}:`, e);
-            return {}; // Retorna um objeto vazio em caso de erro
+            return {}; 
         }
     }
-    return {}; // Se o arquivo não existe, retorna um objeto vazio
+    return {}; 
 }
 
 function salvarJson(filePath, data) {
@@ -47,15 +47,16 @@ function salvarJson(filePath, data) {
 const arquivoTempo = path.join(__dirname, 'data', 'tempo.json');
 const arquivoRanking = path.join(__dirname, 'data', 'ranking.json');
 const arquivoFrasesPersonalizadas = path.join(__dirname, 'data', 'frasesPersonalizadas.json');
-// NOVO: Caminho para o arquivo de usuários bloqueados permanentemente
 const arquivoBlockedUsers = path.join(__dirname, 'data', 'blockedUsers.json');
+// Se você está usando ownerId fixo e não admins.json, pode remover esta linha:
+// const arquivoAdmins = path.join(__dirname, 'data', 'admins.json');
 // --- Fim dos Caminhos dos Arquivos de Dados ---
 
 // Cria o cliente do bot com autenticação local
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        headless: true, // Certifique-se de que headless está como você deseja (true para rodar em background)
+        headless: true, 
         args: ['--no-sandbox']
     }
 });
@@ -67,24 +68,20 @@ const comandosPath = path.join(__dirname, 'commands');
 fs.readdirSync(comandosPath).forEach(file => {
     if (file.endsWith('.js')) {
         const comando = require(path.join(comandosPath, file));
-        // O nome do comando será !maisprovavel (já que o arquivo será maisprovavel.js)
         const nome = '!' + file.replace('.js', '');
         comandos.set(nome, comando);
     }
 });
 
-// Exibe o QR Code no terminal
 client.on('qr', qr => {
     qrcode.generate(qr, { small: true });
     console.log('📱 Escaneie o QR code com o WhatsApp do número do bot.');
 });
 
-// Confirma quando o bot está pronto
 client.on('ready', () => {
     console.log('🤖 Bliss está online e pronta!');
 });
 
-// --- Mensagem de Boas-Vindas para Novos Participantes (EXISTENTE) ---
 client.on('group_join', async (notification) => {
     const chat = await notification.getChat();
     const participant = await client.getContactById(notification.recipientIds[0]);
@@ -114,15 +111,14 @@ Aproveite o grupo! 😉
         console.log(`Mensagem de boas-vindas enviada para ${participant.id.user} no grupo ${chat.name}`);
     }
 });
-// --- Fim da Mensagem de Boas-Vindas ---
 
-// Escuta mensagens recebidas
 client.on('message', async (msg) => {
-    // --- Lógica de Atualização para tempo.json e ranking.json (EXISTENTE) ---
-    // Apenas ignora mensagens do próprio bot
     if (msg.fromMe) return;
 
-    const autorId = msg.author || msg.from;
+    // CORRIGIDO: userId definido no escopo mais amplo
+    const userId = msg.author || msg.from; 
+    const autorId = userId; // autorId é o mesmo que userId neste contexto
+
     let autorContact;
     try {
         autorContact = await client.getContactById(autorId);
@@ -131,44 +127,39 @@ client.on('message', async (msg) => {
         autorContact = { pushname: 'Usuário', verifiedName: 'Usuário', name: 'Usuário', id: { user: autorId.split('@')[0] } };
     }
 
-    const now = Date.now(); // Tempo atual em milissegundos
+    const now = Date.now();
 
-    // --- NOVO: 1. Verificação de Bloqueio Manual Temporário (PRIORIDADE ALTA) ---
+    // --- 1. Verificação de Bloqueio Manual Temporário ---
     if (tempBlockedUsers[autorId] && tempBlockedUsers[autorId] > now) {
         console.log(`Usuário ${autorId} está bloqueado manualmente temporariamente.`);
-        // Opcional: pode adicionar uma flag para enviar o aviso apenas uma vez a cada bloqueio
         await msg.reply(`⚠️ ${autorContact.pushname || autorContact.verifiedName || autorContact.name}, você está temporariamente bloqueado(a) de usar o bot por decisão de um administrador. Por favor, aguarde.`, null, { mentions: [autorContact] });
-        return; // Ignora a mensagem
+        return; 
     } else if (tempBlockedUsers[autorId] && tempBlockedUsers[autorId] <= now) {
-        // Se o tempo de bloqueio expirou, remove o usuário da lista
         delete tempBlockedUsers[autorId];
         console.log(`Bloqueio temporário de ${autorId} expirou.`);
     }
-    // --- FIM DA VERIFICAÇÃO DE BLOQUEIO MANUAL TEMPORÁRIO ---
 
-    // --- NOVO: 2. Verificação de Bloqueio Permanente (ALTA PRIORIDADE) ---
+    // --- 2. Verificação de Bloqueio Permanente ---
     let blockedUsers = [];
     try {
         if (fs.existsSync(arquivoBlockedUsers)) {
-            blockedUsers = JSON.parse(fs.readFileSync(arquivoBlockedUsers, 'utf8'));
+            // Garante que blockedUsers seja um array, mesmo se o arquivo estiver vazio ou corrompido para JSON
+            const content = fs.readFileSync(arquivoBlockedUsers, 'utf8');
+            blockedUsers = content ? JSON.parse(content) : []; 
         }
     } catch (e) {
         console.error('Erro ao carregar blockedUsers.json para verificação:', e);
-        // Em caso de erro, assume lista vazia para não bloquear indevidamente
         blockedUsers = []; 
     }
 
     if (blockedUsers.includes(autorId)) {
         console.log(`Usuário ${autorId} está bloqueado permanentemente. Ignorando.`);
-        return; // Ignora a mensagem
+        return; 
     }
-    // --- FIM DA VERIFICAÇÃO DE BLOQUEIO PERMANENTE ---
 
-    // --- NOVO: 3. Verificação de SPAM (Automática) ---
-    // Apenas rastrear mensagens que parecem ser comandos (começam com '!')
+    // --- 3. Verificação de SPAM (Automática) ---
     const isCommand = msg.body.trim().startsWith('!');
     
-    // Inicializa o rastreador para o usuário se não existir
     if (!spamTracker[autorId]) {
         spamTracker[autorId] = {
             lastCommandTime: now,
@@ -179,7 +170,6 @@ client.on('message', async (msg) => {
     }
     const userData = spamTracker[autorId];
 
-    // Verifica se o usuário já está automaticamente bloqueado por spam
     if (userData.blockedUntil > now) {
         console.log(`Usuário ${autorId} está temporariamente bloqueado por spam.`);
         if (!userData.spamWarningSent) {
@@ -209,13 +199,11 @@ client.on('message', async (msg) => {
             return;
         }
     }
-    // --- FIM DA VERIFICAÇÃO DE SPAM ---
 
-
-    if (msg.id.remote.endsWith('@g.us')) { // Apenas processa mensagens de grupos
+    if (msg.id.remote.endsWith('@g.us')) { 
         const chat = await msg.getChat();
         const groupId = chat.id._serialized;
-        // ... (o resto da lógica de tempo.json, ranking.json, !maisprovavel) ...
+        
         let tempoData = carregarJson(arquivoTempo);
         if (!tempoData[groupId]) {
             tempoData[groupId] = {};
@@ -248,25 +236,20 @@ client.on('message', async (msg) => {
             }
         }
     }
-    // --- Fim da Lógica de Atualização para grupos ---
 
-    // Processamento de comandos (apenas se a mensagem começar com '!')
     const partes = msg.body.trim().toLowerCase().split(' ');
     const comando = partes[0];
     const args = partes.slice(1);
 
-    // Verifica se o comando existe e executa
     if (comandos.has(comando)) {
         const comandoObj = comandos.get(comando);
 
         try {
             if (typeof comandoObj === 'function') {
-                // Comando antigo: função simples (ex: !match, !jogodomatch ou !vod ou !maisprovavel)
-                // NOVO: Passando ownerId para comandos que podem precisar
+                // Passando ownerId para comandos que precisam de permissão de admin
                 await comandoObj(client, msg, args, ownerId); 
             } else if (typeof comandoObj.execute === 'function') {
-                // Comando novo: possui método execute()
-                // NOVO: Passando ownerId para comandos que podem precisar
+                // Passando ownerId para comandos que precisam de permissão de admin
                 await comandoObj.execute(client, msg, args, ownerId); 
             } else {
                 await msg.reply('⚠️ Este comando não está corretamente formatado.');
@@ -278,5 +261,4 @@ client.on('message', async (msg) => {
     }
 });
 
-// Inicia o cliente
 client.initialize();

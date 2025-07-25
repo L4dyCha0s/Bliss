@@ -1,5 +1,44 @@
+const fs = require('fs');
+const path = require('path');
+
 const { verdadeOuDesafioState, TIMEOUT_DURATION_VOD } = require('../gameState'); // Ajuste o caminho
 const { gerarConteudoComGemini } = require('../serviço-gemini'); // Ajuste o caminho para seu módulo Gemini
+
+// Caminho do arquivo para salvar as perguntas/desafios já usados
+const vodHistoricoPath = path.join(__dirname, '..', 'data', 'vod_historico.json');
+
+// Função para carregar o histórico de VOD
+function carregarVodHistorico() {
+    try {
+        if (fs.existsSync(vodHistoricoPath)) {
+            const data = fs.readFileSync(vodHistoricoPath, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (e) {
+        console.error('Erro ao carregar vod_historico.json:', e);
+    }
+    return [];
+}
+
+// Função para salvar uma nova verdade/desafio no histórico
+function salvarVodHistorico(novaEntrada) {
+    let historico = carregarVodHistorico();
+    
+    // Adiciona a nova entrada ao início da lista
+    historico.unshift(novaEntrada);
+    
+    // Limita o número de entradas salvas (ex: últimas 100)
+    const maxEntradas = 100; 
+    if (historico.length > maxEntradas) {
+        historico = historico.slice(0, maxEntradas);
+    }
+
+    try {
+        fs.writeFileSync(vodHistoricoPath, JSON.stringify(historico, null, 2), 'utf8');
+    } catch (e) {
+        console.error('Erro ao salvar nova entrada no vod_historico.json:', e);
+    }
+}
 
 // Função para resetar o estado do jogo VOD
 function resetVodState() {
@@ -136,8 +175,39 @@ A pessoa sorteada/marcada terá um tempo para responder ou realizar. Se ela cons
 
     let perguntaGerada;
     try {
-        const prompt = `Gere uma ${choice} para o jogo "Verdade ou Desafio". O nível de "pesado" deve ser ${level} (onde 1 é muito leve e 5 é extremamente pesado/ousado, mas sempre mantendo um limite para ser um jogo de grupo). Não inclua a palavra "verdade" ou "desafio" na resposta.`;
-        perguntaGerada = await gerarConteudoComGemini(prompt);
+        const historicoVod = carregarVodHistorico();
+        let promptBase = `Gere uma ${choice} para o jogo "Verdade ou Desafio".`;
+        let instrucaoNivel;
+
+        switch (level) {
+            case 1:
+                instrucaoNivel = `O nível é 1 (muito leve, totalmente inocente e divertido, para todas as idades).`;
+                break;
+            case 2:
+                instrucaoNivel = `O nível é 2 (leve, divertido, talvez um pouco constrangedor mas nada demais).`;
+                break;
+            case 3:
+                instrucaoNivel = `O nível é 3 (médio, pode ser um pouco pessoal, divertido, mas ainda apropriado para a maioria dos grupos).`;
+                break;
+            case 4:
+                instrucaoNivel = `O nível é 4 (ousado, íntimo, talvez um pouco picante ou com duplo sentido, mas nunca explícito. Focado em flerte, crushes, ou situações de festa).`;
+                break;
+            case 5:
+                instrucaoNivel = `O nível é 5 (bastante íntimo, sexual, ou promíscuo, mas *sem ser explícito ou vulgar*. Use insinuações, referências a flertes, beijos, fantasias, crushes secretos, ou situações de balada/conquista de forma sugestiva e divertida, sem termos chulos).`;
+                break;
+            default:
+                instrucaoNivel = `O nível é ${level} (padrão).`;
+        }
+
+        let promptCompleto = `${promptBase} ${instrucaoNivel} Não inclua a palavra "verdade" ou "desafio" na resposta.`;
+
+        // Adiciona a instrução para não repetir perguntas anteriores
+        if (historicoVod.length > 0) {
+            const entradasFormatadas = historicoVod.map(e => `"${e.replace(/"/g, '')}"`).join(', ');
+            promptCompleto += ` **Não repita nenhuma das seguintes frases:** ${entradasFormatadas}.`;
+        }
+
+        perguntaGerada = await gerarConteudoComGemini(promptCompleto);
         
         if (!perguntaGerada || perguntaGerada.trim() === '') {
             perguntaGerada = `Não foi possível gerar uma ${choice} para você neste momento. Tente novamente!`;
@@ -150,10 +220,13 @@ A pessoa sorteada/marcada terá um tempo para responder ou realizar. Se ela cons
     // Envia a pergunta/desafio gerada pela IA
     await chat.sendMessage(
         `@${sorteadoContact.id.user}, aqui está seu(sua) ${choice} (Nível ${level}):\n\n` +
-        `"${perguntaGerada}"\n\n` +
+        `"${perguntaGerada.trim()}"\n\n` +
         `Você tem ${TIMEOUT_DURATION_VOD / 1000 / 60} minutos para responder/realizar! Para avisar que terminou, envie \`!vod\`.`,
         { mentions: [sorteadoContact] }
     );
+
+    // Salva a pergunta/desafio gerada para evitar repetição futura
+    salvarVodHistorico(perguntaGerada.trim());
 
     // Define o timeout para a resposta do jogador
     verdadeOuDesafioState.gameTimeout = setTimeout(async () => {

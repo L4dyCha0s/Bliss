@@ -32,8 +32,7 @@ Para falar comigo use !bliss. (Sou uma IA para interações leves)
 *!citações*
 *!conselho* 
 *!sticker* 
-*!sorteio* 
-*!seduzir* 
+*!sorteio*  
 
 Para mais informações ou sugestões, fale com os adms ou com a Stella.💬
 

@@ -1,36 +1,74 @@
-const { gerarConteudoComGemini } = require('../serviço-gemini'); // Ajuste o caminho para seu módulo Gemini
+const fs = require('fs');
+const path = require('path');
+const { gerarConteudoComGemini } = require('../servico-gemini'); // Certifique-se do caminho correto
+
+// Caminho do arquivo para salvar os conselhos já usados
+const conselhosUsadosPath = path.join(__dirname, '..', 'data', 'conselhos_usados.json');
+
+// Função para carregar os conselhos salvos do arquivo
+function carregarConselhosUsados() {
+    try {
+        if (fs.existsSync(conselhosUsadosPath)) {
+            const data = fs.readFileSync(conselhosUsadosPath, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (e) {
+        console.error('Erro ao carregar conselhos salvos:', e);
+    }
+    return [];
+}
+
+// Função para salvar um novo conselho no arquivo
+function salvarNovoConselho(novoConselho) {
+    let conselhosUsados = carregarConselhosUsados();
+
+    // Adiciona o novo conselho ao início da lista
+    conselhosUsados.unshift(novoConselho);
+
+    // Limita o número de conselhos salvos (ex: últimas 50)
+    const maxConselhos = 50; 
+    if (conselhosUsados.length > maxConselhos) {
+        conselhosUsados = conselhosUsados.slice(0, maxConselhos);
+    }
+
+    try {
+        fs.writeFileSync(conselhosUsadosPath, JSON.stringify(conselhosUsados, null, 2), 'utf8');
+    } catch (e) {
+        console.error('Erro ao salvar novo conselho:', e);
+    }
+}
 
 module.exports = async (client, msg) => {
     const chat = await msg.getChat();
-
-    if (!chat.isGroup) {
-        msg.reply('Este comando só funciona em grupos.');
-        return;
-    }
-
-    await msg.reply('🤔 Pensando em um conselho... aguarde um instante!');
+    await msg.reply('🤔 Pensando em um conselho profundo...');
 
     let conselhoGerado;
     try {
-        // Prompt para a IA Gemini com o tom desejado
-        const prompt = `Gere um conselho curto, divertido e com uma pitada de ousadia ou sarcasmo para um grupo de jovens adultos (20-28 anos). Pense em situações de relacionamentos, vida social, festas, ou dilemas cotidianos com um toque de "fogo adolescente". Não seja vulgar, mas seja direto e com um tom de "amigo dando um toque". Use emojis se quiser.
-Exemplos de tom:
-- "Se o crush não te responde em 24h, ele não está ocupado, ele está te ignorando. Bola pra frente!"
-- "A vida é muito curta pra não mandar aquela indireta bem direta no status."
-- "Se a balada tá fraca, seja a balada! 🔥"
-- "Nunca confie em quem diz que vai sair 'só uma rapidinha' e volta às 6h da manhã."
-- "Se for pra ter arrependimentos, que sejam dos bons e com ótimas histórias pra contar."
-O conselho deve ter no máximo 2 frases.`; //qui beleza
-            
+        // Carrega os conselhos usados anteriormente
+        const conselhosAnteriores = carregarConselhosUsados();
+        let prompt;
+
+        if (conselhosAnteriores.length > 0) {
+            // Formata os conselhos anteriores para incluir no prompt
+            const conselhosFormatados = conselhosAnteriores.map(c => `"${c.replace(/"/g, '')}"`).join(', ');
+            prompt = `Gere um conselho aleatório, sábio e com um toque de humor ou sarcasmo. O conselho deve ser conciso (uma ou duas frases). **Não repita nenhum dos seguintes conselhos:** ${conselhosFormatados}.`;
+        } else {
+            // Prompt inicial se não houver histórico
+            prompt = `Gere um conselho aleatório, sábio e com um toque de humor ou sarcasmo. O conselho deve ser conciso (uma ou duas frases).`;
+        }
+
         conselhoGerado = await gerarConteudoComGemini(prompt);
-        
+
         if (!conselhoGerado || conselhoGerado.trim() === '') {
-            conselhoGerado = 'Não foi possível gerar um conselho para você neste momento. Tente novamente!';
+            conselhoGerado = 'Não foi possível gerar um conselho agora. Tente novamente!';
         }
     } catch (error) {
-        console.error('Erro ao gerar conteúdo com Gemini para !conselho:', error);
+        console.error('Erro ao gerar conselho com Gemini:', error);
         conselhoGerado = 'Houve um erro ao gerar o conselho com a IA. Por favor, tente novamente mais tarde.';
     }
 
-    await chat.sendMessage(`✨ *Conselho do Dia (ou da Noite):*\n\n"${conselhoGerado}"`);
+    await chat.sendMessage(`💡 *Conselho do dia:*\n\n"${conselhoGerado.trim()}"`);
+
+    // Salva o conselho gerado para evitar repetição futura
+    salvarNovoConselho(conselhoGerado.trim());
 };

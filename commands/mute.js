@@ -10,12 +10,15 @@ module.exports = {
             return;
         }
 
-        const participant = await chat.getParticipantById(autorId);
+        // --- CORREÇÃO FINAL AQUI ---
+        // Acessa a propriedade 'participants' do objeto chat para encontrar o autor
+        const participant = chat.participants.find(p => p.id._serialized === autorId);
         
-        if (!participant.isAdmin) {
+        if (!participant || !participant.isAdmin) {
             msg.reply('❌ Apenas administradores do grupo podem usar este comando.');
             return;
         }
+        // --- FIM DA CORREÇÃO ---
 
         const mentionedIds = msg.mentionedIds;
         if (mentionedIds.length === 0) {

@@ -1,6 +1,6 @@
 module.exports = {
     name: 'mute',
-    description: 'Silencia um membro do grupo por um período de tempo (em horas). Ex: !mute @membro 8',
+    description: 'Silencia um membro do grupo por um período de tempo (em horas). Tempo padrão: 1h. Ex: !mute @membro 3',
     async execute(client, msg, args) {
         const chat = await msg.getChat();
         const autorId = msg.author || msg.from;
@@ -10,19 +10,16 @@ module.exports = {
             return;
         }
 
-        // --- CORREÇÃO FINAL AQUI ---
-        // Acessa a propriedade 'participants' do objeto chat para encontrar o autor
         const participant = chat.participants.find(p => p.id._serialized === autorId);
         
         if (!participant || !participant.isAdmin) {
             msg.reply('❌ Apenas administradores do grupo podem usar este comando.');
             return;
         }
-        // --- FIM DA CORREÇÃO ---
 
         const mentionedIds = msg.mentionedIds;
         if (mentionedIds.length === 0) {
-            msg.reply('⚠️ Você precisa marcar o membro que deseja silenciar. Ex: `!mute @membro 8`');
+            msg.reply('⚠️ Você precisa marcar o membro que deseja silenciar. Ex: `!mute @membro 1`');
             return;
         }
 
@@ -34,7 +31,8 @@ module.exports = {
             return;
         }
         
-        let durationHours = 8;
+        // --- ALTERAÇÃO AQUI: TEMPO PADRÃO MUDOU PARA 1 HORA ---
+        let durationHours = 1;
         if (args[1]) {
             const parsedDuration = parseInt(args[1], 10);
             if (!isNaN(parsedDuration) && parsedDuration > 0) {
@@ -45,6 +43,8 @@ module.exports = {
         const muteDurationMs = durationHours * 60 * 60 * 1000;
         
         try {
+            // --- CORREÇÃO FINAL AQUI ---
+            // Passa a duração em milisegundos (um número)
             await chat.mute(muteDurationMs);
             msg.reply(`✅ @${memberToMute.id.user} foi silenciado(a) no grupo por ${durationHours} horas.`);
             console.log(`Membro ${memberToMute.id.user} silenciado por ${durationHours} horas.`);

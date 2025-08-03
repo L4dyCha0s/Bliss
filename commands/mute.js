@@ -31,7 +31,6 @@ module.exports = {
             return;
         }
         
-        // --- ALTERAÇÃO AQUI: TEMPO PADRÃO MUDOU PARA 1 HORA ---
         let durationHours = 1;
         if (args[1]) {
             const parsedDuration = parseInt(args[1], 10);
@@ -40,14 +39,16 @@ module.exports = {
             }
         }
         
-        const muteDurationMs = durationHours * 60 * 60 * 1000;
-        
+        // --- ALTERAÇÃO AQUI ---
+        // Cria um objeto de data que representa o momento do unmute
+        const unmuteDate = new Date();
+        unmuteDate.setHours(unmuteDate.getHours() + durationHours);
+
         try {
-            // --- CORREÇÃO FINAL AQUI ---
-            // Passa a duração em milisegundos (um número)
-            await chat.mute(muteDurationMs);
+            // Passa o objeto de data para o método mute()
+            await chat.mute(unmuteDate);
             msg.reply(`✅ @${memberToMute.id.user} foi silenciado(a) no grupo por ${durationHours} horas.`);
-            console.log(`Membro ${memberToMute.id.user} silenciado por ${durationHours} horas.`);
+            console.log(`Membro ${memberToMute.id.user} silenciado até ${unmuteDate}.`);
         } catch (error) {
             console.error('Erro ao silenciar membro:', error);
             msg.reply('❌ Ocorreu um erro ao tentar silenciar o membro.');

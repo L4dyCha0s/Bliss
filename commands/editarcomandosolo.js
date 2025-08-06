@@ -28,42 +28,65 @@ function salvarJson(filePath, data) {
 
 module.exports = async (client, msg) => {
     if (!msg.hasQuotedMsg) {
-        // Se o usuário apenas digitou o comando sem responder a nada
         let frasesData = carregarJson(arquivoFrasesPersonalizadas);
         const userId = msg.author || msg.from;
-        
-        if (frasesData[userId]) {
-            return msg.reply(`⚠️ Você deve **responder** à mensagem que deseja salvar.\nSua frase atual é: "${frasesData[userId].content}"`);
-        } else {
-            return msg.reply('⚠️ Você ainda não configurou um comando solo. Por favor, **responda** à mensagem que deseja salvar para configurá-la.');
-        }
-        return;
+        
+        if (frasesData[userId]) {
+            return msg.reply(`⚠️ Você deve **responder** à mensagem que deseja salvar.\nSua frase atual é: "${frasesData[userId].content}"`);
+        } else {
+            return msg.reply('⚠️ Você ainda não configurou um comando solo. Por favor, **responda** à mensagem que deseja salvar para configurá-la.');
+        }
     }
 
     const quotedMsg = await msg.getQuotedMessage();
     const userId = msg.author || msg.from;
-    
+    
     let frasesData = carregarJson(arquivoFrasesPersonalizadas);
     let contentToSave;
 
     try {
+        // --- ALTERAÇÃO AQUI: Captura os IDs das menções da mensagem respondida ---
+        const mentionedIds = quotedMsg.mentionedIds || [];
+
         if (quotedMsg.type === 'sticker') {
             const media = await quotedMsg.downloadMedia();
-            contentToSave = { type: 'sticker', content: media.data, mimetype: media.mimetype };
+            contentToSave = { 
+                type: 'sticker', 
+                content: media.data, 
+                mimetype: media.mimetype,
+                mentionedIds: mentionedIds // Salva os IDs
+            };
             await msg.reply('✅ Sua figurinha foi salva com sucesso para o comando !comandosolo.');
 
         } else if (quotedMsg.type === 'image') {
             const media = await quotedMsg.downloadMedia();
-            contentToSave = { type: 'image', content: media.data, mimetype: media.mimetype };
+            // ALTERAÇÃO: Salva a legenda da imagem e os IDs de menção
+            contentToSave = { 
+                type: 'image', 
+                content: media.data, 
+                mimetype: media.mimetype,
+                caption: quotedMsg.body,
+                mentionedIds: mentionedIds
+            };
             await msg.reply('✅ Sua foto foi salva com sucesso para o comando !comandosolo.');
 
         } else if (quotedMsg.type === 'audio' || quotedMsg.type === 'ptt') {
             const media = await quotedMsg.downloadMedia();
-            contentToSave = { type: 'audio', content: media.data, mimetype: media.mimetype };
+            contentToSave = { 
+                type: 'audio', 
+                content: media.data, 
+                mimetype: media.mimetype,
+                mentionedIds: mentionedIds // Salva os IDs
+            };
             await msg.reply('✅ Seu áudio foi salvo com sucesso para o comando !comandosolo.');
 
         } else if (quotedMsg.body) {
-            contentToSave = { type: 'text', content: quotedMsg.body };
+            // ALTERAÇÃO: Salva o texto e os IDs de menção
+            contentToSave = { 
+                type: 'text', 
+                content: quotedMsg.body,
+                mentionedIds: mentionedIds
+            };
             await msg.reply('✅ Seu texto foi salvo com sucesso para o comando !comandosolo.');
 
         } else {

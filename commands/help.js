@@ -24,13 +24,15 @@ Para falar comigo use !bliss. (Sou uma IA para interações leves)
 *!d6*
 *!d20*
 *!d20dt*
-*!aniversario*
+*!aniversarios*
 *!duolingo*
 *!sorteio* 
 *!comandosolo* 
 *!ficha*  
 *!ranking* 
 *!resumo* 
+*!pdf*
+*!lembrete*
 *!citações*
 *!conselho* 
 *!sticker* 

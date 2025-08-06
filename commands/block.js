@@ -68,7 +68,7 @@ module.exports = async (client, msg, args, ownerId) => {
             `✅ Usuário @${contatoMencionado.id.user} foi *bloqueado temporariamente* por ${duracaoFormatada}.`,
             { mentions: [contatoMencionado] }
         );
-        console.log(`Admin ${autorId} bloqueou temporariamente ${idMencionado} por ${duracaoFormatada}.`);
+        console.log(`Admin ${autorId} bloqueou temporariamente ${contatoMencionado.id.user} por ${duracaoFormatada}.`);
 
     } else {
         let blockedUsers = [];

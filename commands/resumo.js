@@ -7,7 +7,7 @@ module.exports = {
     async execute(client, message, args) {
         try {
             const chat = await message.getChat();
-            const mensagens = await chat.fetchMessages({ limit: 200 });
+            const mensagens = await chat.fetchMessages({ limit: 500 });
 
             const textos = mensagens
                 .filter(msg => msg.body && !msg.body.startsWith('!'))
@@ -31,7 +31,7 @@ ${textos}
             `;
 
             const resposta = await gerarConteudoComGemini(prompt);
-            await message.reply(`🧃 *Fofoca das últimas 200 mensagens resumida:*\n\n${resposta}`);
+            await message.reply(`🧃 *Fofoca das últimas 500 mensagens resumida:*\n\n${resposta}`);
         } catch (err) {
             console.error('[ERRO RESUMO]', err);
             await message.reply('❌ Ocorreu um erro ao tentar resumir a conversa.');

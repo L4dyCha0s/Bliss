@@ -27,8 +27,11 @@ module.exports = {
             return;
         }
 
+        // CORREÇÃO AQUI: Obter a mensagem respondida de forma assíncrona
+        const quotedMsg = await msg.getQuotedMessage();
+
         // Verifica se o comando está respondendo à mensagem correta
-        if (!msg.hasQuotedMsg || msg.getQuotedMessage()._data.id._serialized !== saidinhaState.proposalMessage.id._serialized) {
+        if (!msg.hasQuotedMsg || !quotedMsg || quotedMsg.id._serialized !== saidinhaState.proposalMessage.id._serialized) {
             msg.reply('⚠️ Você deve **responder** à mensagem de sugestão da saidinha para aprová-la.');
             return;
         }

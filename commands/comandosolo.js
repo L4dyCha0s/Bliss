@@ -24,20 +24,16 @@ module.exports = async (client, msg) => {
     const userContent = frasesData[userId];
 
     if (userContent) {
-        // --- NOVO CÓDIGO AQUI: Lógica para identificar e enviar o conteúdo ---
-        
-        // --- Adiciona a lógica de menção a todas as mensagens de retorno ---
+        // --- Lógica para identificar e enviar o conteúdo ---
         const sendOptions = {};
         if (userContent.mentionedIds && userContent.mentionedIds.length > 0) {
             sendOptions.mentions = userContent.mentionedIds;
         }
 
         if (userContent.type === 'text') {
-            // CORREÇÃO: Usando client.sendMessage para poder passar as menções
             await client.sendMessage(msg.from, userContent.content, sendOptions);
         } else if (userContent.type === 'image') {
             const media = new MessageMedia(userContent.mimetype, userContent.content);
-            // Adiciona a legenda e as menções, se existirem
             if (userContent.caption) {
                 sendOptions.caption = userContent.caption;
             }
@@ -51,8 +47,16 @@ module.exports = async (client, msg) => {
             sendOptions.sendMediaAsAudio = true;
             await client.sendMessage(msg.from, media, sendOptions);
         }
-        // --- Fim da nova lógica ---
     } else {
-        await msg.reply('Você ainda não configurou uma frase para o seu comando !comandosolo.\nUse *!editarcomandosolo sua frase personalizada aqui* para definir uma!');
+        // --- ALTERAÇÃO AQUI: Mensagem mais detalhada ---
+        const helpMessage = `
+*O que é o Comando Solo?*
+É um comando pessoal e único! Ele salva uma mensagem (texto, foto, vídeo, áudio ou figurinha) por pessoa. Quando você usa *!comandosolo*, o bot reenvia sua mídia salva.
+
+*Como definir o seu?*
+Use o comando *!editarcomandosolo* respondendo à mensagem que você quer salvar.
+
+_Exemplo:_ Responda a uma foto e use o comando \`!editarcomandosolo\`. A foto será sua mídia solo!`;
+        await msg.reply(helpMessage);
     }
 };

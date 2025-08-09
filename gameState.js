@@ -43,6 +43,12 @@ const SPAM_BLOCK_DURATION = 60 * 1000; // Bloquear por 60 segundos (em milissegu
 
 // --- FIM DOS NOVOS ESTADOS E CONSTANTES ---
 
+// --- NOVO ESTADO para "Saidinha" ---
+let saidinhaState = {
+    isActive: false, // Indica se uma sugestão de saidinha está aguardando aprovação
+    authorId: null, // O ID do membro que fez a sugestão
+    proposalMessage: null, // O objeto da mensagem original com a ficha preenchida
+};
 
 const TIMEOUT_DURATION_MATCH = 5 * 60 * 1000; // 5 minutos para o Jogo do Match
 // --- ALTERAÇÃO AQUI: Duração do timeout para Verdade ou Desafio foi mudada para 5 minutos ---
@@ -53,6 +59,7 @@ module.exports = {
     jogoDoMatchState,
     verdadeOuDesafioState,
     maisProvavelState, // Exporta o novo estado
+    saidinhaState,
     TIMEOUT_DURATION_MATCH,
     TIMEOUT_DURATION_VOD,
     TIMEOUT_DURATION_MAIS_PROVAVEL, // Exporta o novo timeout

@@ -90,7 +90,7 @@ client.on('group_join', async (notification) => {
         const welcomeMessage = `
 Bem-vindo(a) ao grupo, @${participant.id.user}! 🎉
 
-Para uma melhor experiência e para que todos se conheçam, pedimos que faça sua apresentação preenchendo o modelo abaixo:
+Para uma melhor experiência e para que todos se conheçam, pedimos que faça sua apresentação preenchendo o modelo abaixo (sem visualização unica):
 
 🏳‍🌈 APRESENTAÇÃO 🏳‍🌈
 
@@ -103,6 +103,7 @@ Para uma melhor experiência e para que todos se conheçam, pedimos que faça su
 ❖ Uma curiosidade sobre você:
 ❖ Instagram:
 
+Digite !regras para ver as regras do grupo
 Aproveite o grupo! 😉
         `;
         await chat.sendMessage(welcomeMessage, {

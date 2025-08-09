@@ -24,6 +24,9 @@ Para falar comigo use !bliss. (Sou uma IA para interações leves)
 *!d6*
 *!d20*
 *!d20dt*
+*!faq*
+*!regras*
+*!saidnha*
 *!aniversarios*
 *!duolingo*
 *!sorteio* 

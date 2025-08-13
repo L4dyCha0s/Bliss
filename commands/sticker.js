@@ -16,7 +16,7 @@ module.exports = async (client, msg) => {
     }
 
     try {
-        msg.reply('⌛ Convertendo imagem em figurinha...');
+      //  msg.reply('⌛ Convertendo imagem em figurinha...');
 
         // Pega a mídia da mensagem (imagem)
         const media = await messageToProcess.downloadMedia();

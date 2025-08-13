@@ -45,9 +45,23 @@ const SPAM_BLOCK_DURATION = 60 * 1000; // Bloquear por 60 segundos (em milissegu
 
 // --- NOVO ESTADO para "Saidinha" ---
 let saidinhaState = {
-    isActive: false, // Indica se uma sugestão de saidinha está aguardando aprovação
-    authorId: null, // O ID do membro que fez a sugestão
-    proposalMessage: null, // O objeto da mensagem original com a ficha preenchida
+    isActive: false, // Indica se uma sugestão de saidinha está aguardando aprovação
+    authorId: null, // O ID do membro que fez a sugestão
+    proposalMessage: null, // O objeto da mensagem original com a ficha preenchida
+};
+
+// --- NOVO ESTADO para o sistema de MUTE que apaga mensagens ---
+// Formato: { userId: timestamp_até_o_bloqueio_expirar }
+let tempMutedUsers = {};
+
+// --- NOVO ESTADO para o sistema de VOTAÇÃO de BANIMENTO ---
+let banVote = {
+    isActive: false,
+    groupId: null,
+    proposerId: null,
+    targetUserId: null,
+    targetUserName: null,
+    votes: []
 };
 
 const TIMEOUT_DURATION_MATCH = 5 * 60 * 1000; // 5 minutos para o Jogo do Match
@@ -60,6 +74,8 @@ module.exports = {
     verdadeOuDesafioState,
     maisProvavelState, // Exporta o novo estado
     saidinhaState,
+    tempMutedUsers, // NOVO: Estado para o mute que apaga mensagens
+    banVote, // NOVO: Estado para a votação de banimento
     TIMEOUT_DURATION_MATCH,
     TIMEOUT_DURATION_VOD,
     TIMEOUT_DURATION_MAIS_PROVAVEL, // Exporta o novo timeout

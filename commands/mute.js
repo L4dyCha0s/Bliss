@@ -1,6 +1,8 @@
+const { tempMutedUsers } = require('../gameState');
+
 module.exports = {
     name: 'mute',
-    description: 'Silencia um membro do grupo por um período de tempo (em horas). Tempo padrão: 1h. Ex: !mute @membro 3',
+    description: 'Silencia um membro do grupo por um período. Mensagens enviadas serão apagadas. Tempo padrão: 5min. Ex: !mute @membro 10 (10 minutos)',
     async execute(client, msg, args) {
         const chat = await msg.getChat();
         const autorId = msg.author || msg.from;
@@ -19,7 +21,7 @@ module.exports = {
 
         const mentionedIds = msg.mentionedIds;
         if (mentionedIds.length === 0) {
-            msg.reply('⚠️ Você precisa marcar o membro que deseja silenciar. Ex: `!mute @membro 1`');
+            msg.reply('⚠️ Você precisa marcar o membro que deseja silenciar. Ex: `!mute @membro 5`');
             return;
         }
 
@@ -30,28 +32,23 @@ module.exports = {
             msg.reply('Eu não posso me silenciar!');
             return;
         }
-        
-        let durationHours = 1;
+
+        // Tempo padrão de 5 minutos
+        let durationMinutes = 5;
         if (args[1]) {
             const parsedDuration = parseInt(args[1], 10);
             if (!isNaN(parsedDuration) && parsedDuration > 0) {
-                durationHours = parsedDuration;
+                durationMinutes = parsedDuration;
             }
         }
         
-        // --- ALTERAÇÃO AQUI ---
-        // Cria um objeto de data que representa o momento do unmute
-        const unmuteDate = new Date();
-        unmuteDate.setHours(unmuteDate.getHours() + durationHours);
+        // Define a data/hora de expiração do mute
+        const unmuteTime = Date.now() + (durationMinutes * 60 * 1000);
+        
+        // Registra o usuário no estado do bot
+        tempMutedUsers[memberToMuteId] = unmuteTime;
 
-        try {
-            // Passa o objeto de data para o método mute()
-            await chat.mute(unmuteDate);
-            msg.reply(`✅ @${memberToMute.id.user} foi silenciado(a) no grupo por ${durationHours} horas.`);
-            console.log(`Membro ${memberToMute.id.user} silenciado até ${unmuteDate}.`);
-        } catch (error) {
-            console.error('Erro ao silenciar membro:', error);
-            msg.reply('❌ Ocorreu um erro ao tentar silenciar o membro.');
-        }
+        msg.reply(`✅ @${memberToMute.id.user} foi silenciado(a)`);
+        console.log(`Membro ${memberToMute.id.user} silenciado até ${new Date(unmuteTime)}.`);
     }
 };

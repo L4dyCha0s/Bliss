@@ -11,10 +11,12 @@ function carregarVodHistorico() {
     try {
         if (fs.existsSync(vodHistoricoPath)) {
             const data = fs.readFileSync(vodHistoricoPath, 'utf8');
-            return JSON.parse(data);
+            const parsedData = JSON.parse(data);
+            // CORREÇÃO: Garante que os dados carregados são um array
+            return Array.isArray(parsedData) ? parsedData : [];
         }
     } catch (e) {
-        console.error('Erro ao carregar vod_historico.json:', e);
+        console.error('Erro ao carregar ou parsear vod_historico.json:', e);
     }
     return [];
 }
@@ -52,14 +54,14 @@ function resetVodState() {
 
 // Nova função para finalizar a rodada com sucesso
 function endVodTurn(nextChooserId) {
-    verdadeOuDesafioState.isActive = false;
-    verdadeOuDesafioState.currentPlayerId = null;
-    verdadeOuDesafioState.currentPlayerContact = null;
-    verdadeOuDesafioState.choice = null;
-    verdadeOuDesafioState.level = 0;
-    clearTimeout(verdadeOuDesafioState.gameTimeout);
-    verdadeOuDesafioState.gameTimeout = null;
-    verdadeOuDesafioState.nextChooserId = nextChooserId; // Mantém o direito de escolher
+    verdadeOuDesafioState.isActive = false;
+    verdadeOuDesafioState.currentPlayerId = null;
+    verdadeOuDesafioState.currentPlayerContact = null;
+    verdadeOuDesafioState.choice = null;
+    verdadeOuDesafioState.level = 0;
+    clearTimeout(verdadeOuDesafioState.gameTimeout);
+    verdadeOuDesafioState.gameTimeout = null;
+    verdadeOuDesafioState.nextChooserId = nextChooserId; // Mantém o direito de escolher
 }
 // --- Fim das funções de controle de estado ---
 

@@ -11,7 +11,10 @@ const {
     SPAM_MAX_COMMANDS,
     SPAM_TIME_WINDOW,
     SPAM_BLOCK_DURATION,
-    tempBlockedUsers
+    tempBlockedUsers,
+    // NOVO: Importa os estados para mute e ban
+    tempMutedUsers,
+    banVote
 } = require('./gameState'); 
 
 // --- Fim das Importações de Módulos ---
@@ -21,6 +24,9 @@ const {
 const ownerId = '5518997572004@c.us'; 
 // --- Fim da Definição do ID do Administrador ---
 
+// --- NOVO: ID do Grupo Específico para a mensagem de boas-vindas ---
+const TARGET_GROUP_ID = '120363336898986670@g.us'; 
+// Substitua 'SEU_ID_DE_GRUPO_AQUI@g.us' pelo ID real do seu grupo.
 
 // --- Funções Auxiliares para JSON (EXISTENTES) ---
 function carregarJson(filePath) {
@@ -86,7 +92,8 @@ client.on('group_join', async (notification) => {
     const chat = await notification.getChat();
     const participant = await client.getContactById(notification.recipientIds[0]);
 
-    if (chat.isGroup) {
+    // CORREÇÃO AQUI: Verifica se é o grupo alvo
+    if (chat.isGroup && chat.id._serialized === TARGET_GROUP_ID) {
         const welcomeMessage = `
 Bem-vindo(a) ao grupo, @${participant.id.user}! 🎉
 
@@ -129,6 +136,22 @@ client.on('message', async (msg) => {
     }
 
     const now = Date.now();
+
+    // --- NOVO: Verificação de Mute Temporário que apaga mensagens ---
+    if (tempMutedUsers[autorId] && tempMutedUsers[autorId] > now) {
+        console.log(`Usuário ${autorId} está silenciado. Apagando mensagem.`);
+        
+        try {
+            await msg.delete(true); 
+        } catch (e) {
+            console.error('Erro ao apagar mensagem de usuário silenciado:', e);
+        }
+        return; // Interrompe a execução para não processar comandos
+    } else if (tempMutedUsers[autorId] && tempMutedUsers[autorId] <= now) {
+        // Remove o usuário da lista se o tempo de mute expirou
+        delete tempMutedUsers[autorId];
+        console.log(`Mute de ${autorId} expirou.`);
+    }
 
     // --- 1. Verificação de Bloqueio Manual Temporário ---
     if (tempBlockedUsers[autorId] && tempBlockedUsers[autorId] > now) {
@@ -235,6 +258,62 @@ client.on('message', async (msg) => {
             } else {
                 console.log(`[MAIS PROVÁVEL - Erro] ${userId} mencionou um ID inválido para voto.`);
             }
+        }
+    }
+    
+    // --- NOVO: Bloco para processar a votação de banimento ---
+    const chat = await msg.getChat();
+    const groupId = chat.id._serialized;
+    const comandoVoto = msg.body.trim().toLowerCase();
+
+    if (comandoVoto === '!votarbanir' && banVote.isActive && banVote.groupId === groupId) {
+        // Verifica se a mensagem de votação está respondendo à mensagem correta
+        if (!msg.hasQuotedMsg) {
+            msg.reply('⚠️ Para votar, você deve responder à mensagem de votação com `!votarbanir`.');
+            return;
+        }
+        
+        const quotedMsg = await msg.getQuotedMessage();
+        const voteMessageContent = `O membro @${banVote.targetUserName} foi indicado para ser expulso.`;
+        if (!quotedMsg.body.includes(voteMessageContent)) {
+            return; // Ignora se não está respondendo à mensagem correta
+        }
+
+        // Verifica se a pessoa já votou
+        if (banVote.votes.includes(autorId)) {
+            msg.reply('⚠️ Você já votou nesta rodada.');
+            return;
+        }
+        
+        // A pessoa não pode votar em si mesma (se for o alvo) ou no voto que ela mesma iniciou
+        if (autorId === banVote.targetUserId || autorId === banVote.proposerId) {
+            msg.reply('⚠️ Você não pode votar nesta rodada.');
+            return;
+        }
+
+        // Adiciona o voto
+        banVote.votes.push(autorId);
+        const votosAtuais = banVote.votes.length;
+        const votosNecessarios = 10;
+
+        if (votosAtuais >= votosNecessarios) {
+            // Votação aprovada, expulsa o membro
+            try {
+                await chat.removeParticipants([banVote.targetUserId]);
+                msg.reply(`✅ Votação concluída! Com ${votosAtuais} votos, @${banVote.targetUserName} foi expulso(a) do grupo.`);
+            } catch (error) {
+                console.error('Erro ao expulsar membro por votação:', error);
+                msg.reply('❌ Ocorreu um erro ao expulsar o membro. O bot pode não ter permissão de administrador.');
+            } finally {
+                // Reseta o estado da votação
+                banVote.isActive = false;
+                banVote.groupId = null;
+                banVote.proposerId = null;
+                banVote.targetUserId = null;
+                banVote.votes = [];
+            }
+        } else {
+            msg.reply(`🗳️ Voto registrado! Faltam ${votosNecessarios - votosAtuais} votos para o banimento.`);
         }
     }
 

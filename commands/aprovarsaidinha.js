@@ -40,8 +40,7 @@ module.exports = {
         const allParticipants = chat.participants.filter(p => p.id._serialized !== client.info.wid._serialized);
         const allMentions = allParticipants.map(p => p.id._serialized);
 
-        const saidinhaMessage = `
-🎉🎉 **SAIDINHA APROVADA!** 🎉🎉
+        const saidinhaMessage = `🎉 **SAIDINHA APROVADA!** 🎉
 A sugestão de saidinha foi aprovada e está confirmada!
 
 ${saidinhaState.proposalMessage.body}

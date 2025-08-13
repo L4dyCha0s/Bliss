@@ -67,6 +67,7 @@ const client = new Client({
     }
 });
 
+//
 // Carrega comandos da pasta /commands
 const comandos = new Map();
 const comandosPath = path.join(__dirname, 'commands');

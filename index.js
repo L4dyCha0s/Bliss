@@ -62,6 +62,7 @@ const arquivoBlockedUsers = path.join(__dirname, 'data', 'blockedUsers.json');
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome',
         headless: true, 
         args: ['--no-sandbox']
     }

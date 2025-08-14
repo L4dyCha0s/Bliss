@@ -86,9 +86,9 @@ module.exports = async (client, msg, args, ownerId) => {
         if (!blockedUsers.includes(idMencionado)) {
             blockedUsers.push(idMencionado);
             salvarBlockedUsers(blockedUsers);
-            msg.reply(`✅ Usuário ${nomeMencionado} (@${contatoMencionado.id.user}) foi *bloqueado permanentemente* com sucesso!`);
+            msg.reply(`✅ Usuário @${contatoMencionado.id.user} foi *bloqueado permanentemente* de usar e Bliss. Vai achando que é fácil viver sem a tecnologia! 😝 `);
         } else {
-            msg.reply(`⚠️ Usuário ${nomeMencionado} já está na lista de bloqueados permanentes.`);
+            msg.reply(`⚠️ Usuário @${contatoMencionado.id.user} já está na lista de bloqueados permanentes.`);
         }
     }
 };

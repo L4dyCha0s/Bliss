@@ -3,8 +3,7 @@ module.exports = {
     name: 'saidinha',
     description: 'Envia um modelo para sugerir um role para o grupo.',
     async execute(client, msg) {
-        const helpMessage = `
-🎉 *Sugerir uma Saidinha* 🎉
+        const helpMessage = `🎉 *Sugerir uma Saidinha* 🎉
 
 Para sugerir um role, siga os passos:
 
@@ -15,8 +14,8 @@ Para sugerir um role, siga os passos:
     *Data:* 
     *Hora:* 
     *Local:* [Onde vamos?]
-    *Estilo:* [Ex: Barzinho, Festa, Jantar, Cinema, etc.]
-    *Descrição:* [Comente o role em si, anuncie a idéia]
+    *Estilo:* [Ex: Barzinho, Cinema, etc.]
+    *Descrição:* [Comente o role em si]
     *Ponto de Encontro:* 
     -----------------------------------
 

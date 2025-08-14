@@ -3,45 +3,41 @@ const fs = require('fs');
 const path = require('path');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-const { 
-    jogoDoMatchState, 
-    verdadeOuDesafioState, 
+const {
+    jogoDoMatchState,
+    verdadeOuDesafioState,
     maisProvavelState,
     spamTracker,
     SPAM_MAX_COMMANDS,
     SPAM_TIME_WINDOW,
     SPAM_BLOCK_DURATION,
     tempBlockedUsers,
-    // NOVO: Importa os estados para mute e ban
     tempMutedUsers,
     banVote
-} = require('./gameState'); 
-
+} = require('./gameState');
 // --- Fim das Importações de Módulos ---
 
 // --- Definição do ID do Administrador do Bot (UM ÚNICO ADMIN) ---
 // **Seu user ID para o bot reconhecer como admin**
-const ownerId = '5518997572004@c.us'; 
+const ownerId = '5518997572004@c.us';
 // --- Fim da Definição do ID do Administrador ---
 
 // --- NOVO: ID do Grupo Específico para a mensagem de boas-vindas ---
-const TARGET_GROUP_ID = '120363336898986670@g.us'; 
+const TARGET_GROUP_ID = '120363336898986670@g.us';
 // Substitua 'SEU_ID_DE_GRUPO_AQUI@g.us' pelo ID real do seu grupo.
 
-// --- Funções Auxiliares para JSON (EXISTENTES) ---
+// --- Funções Auxiliares para JSON ---
 function carregarJson(filePath) {
     if (fs.existsSync(filePath)) {
         try {
-            // Garante que para arquivos como blockedUsers.json ou admins.json, retorne array vazio
-            // Se for para arquivos de ranking/tempo que esperam um objeto, retorne objeto vazio
             const content = fs.readFileSync(filePath, 'utf8');
-            return content ? JSON.parse(content) : {}; 
+            return content ? JSON.parse(content) : {};
         } catch (e) {
             console.error(`Erro ao ler/parsear ${filePath}:`, e);
-            return {}; 
+            return {};
         }
     }
-    return {}; 
+    return {};
 }
 
 function salvarJson(filePath, data) {
@@ -54,21 +50,17 @@ const arquivoTempo = path.join(__dirname, 'data', 'tempo.json');
 const arquivoRanking = path.join(__dirname, 'data', 'ranking.json');
 const arquivoFrasesPersonalizadas = path.join(__dirname, 'data', 'frasesPersonalizadas.json');
 const arquivoBlockedUsers = path.join(__dirname, 'data', 'blockedUsers.json');
-// Se você está usando ownerId fixo e não admins.json, pode remover esta linha:
-// const arquivoAdmins = path.join(__dirname, 'data', 'admins.json');
 // --- Fim dos Caminhos dos Arquivos de Dados ---
 
 // Cria o cliente do bot com autenticação local
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome',
-        headless: true, 
+        headless: true,
         args: ['--no-sandbox']
     }
 });
 
-//
 // Carrega comandos da pasta /commands
 const comandos = new Map();
 const comandosPath = path.join(__dirname, 'commands');
@@ -94,14 +86,13 @@ client.on('group_join', async (notification) => {
     const chat = await notification.getChat();
     const participant = await client.getContactById(notification.recipientIds[0]);
 
-    // CORREÇÃO AQUI: Verifica se é o grupo alvo
     if (chat.isGroup && chat.id._serialized === TARGET_GROUP_ID) {
         const welcomeMessage = `
 Bem-vindo(a) ao grupo, @${participant.id.user}! 🎉
 
 Para uma melhor experiência e para que todos se conheçam, pedimos que faça sua apresentação preenchendo o modelo abaixo (sem visualização unica):
 
-🏳‍🌈 APRESENTAÇÃO 🏳‍🌈
+🍹 APRESENTAÇÃO
 
 ❖ Foto:
 ❖ Nome:
@@ -112,7 +103,7 @@ Para uma melhor experiência e para que todos se conheçam, pedimos que faça su
 ❖ Uma curiosidade sobre você:
 ❖ Instagram:
 
-Digite !regras para ver as regras do grupo
+Digite !regras para ver as regras
 Aproveite o grupo! 😉
         `;
         await chat.sendMessage(welcomeMessage, {
@@ -125,9 +116,8 @@ Aproveite o grupo! 😉
 client.on('message', async (msg) => {
     if (msg.fromMe) return;
 
-    // CORRIGIDO: userId definido no escopo mais amplo
-    const userId = msg.author || msg.from; 
-    const autorId = userId; // autorId é o mesmo que userId neste contexto
+    const userId = msg.author || msg.from;
+    const autorId = userId;
 
     let autorContact;
     try {
@@ -139,68 +129,51 @@ client.on('message', async (msg) => {
 
     const now = Date.now();
 
-    // --- NOVO: Verificação de Mute Temporário que apaga mensagens ---
+    // --- Verificação de Mute Temporário ---
     if (tempMutedUsers[autorId] && tempMutedUsers[autorId] > now) {
-        console.log(`Usuário ${autorId} está silenciado. Apagando mensagem.`);
-        
         try {
-            await msg.delete(true); 
+            await msg.delete(true);
         } catch (e) {
             console.error('Erro ao apagar mensagem de usuário silenciado:', e);
         }
-        return; // Interrompe a execução para não processar comandos
+        return;
     } else if (tempMutedUsers[autorId] && tempMutedUsers[autorId] <= now) {
-        // Remove o usuário da lista se o tempo de mute expirou
         delete tempMutedUsers[autorId];
-        console.log(`Mute de ${autorId} expirou.`);
     }
 
-    // --- 1. Verificação de Bloqueio Manual Temporário ---
+    // --- Verificação de Bloqueio Manual Temporário e Permanente ---
     if (tempBlockedUsers[autorId] && tempBlockedUsers[autorId] > now) {
-        console.log(`Usuário ${autorId} está bloqueado manualmente temporariamente.`);
         await msg.reply(`⚠️ ${autorContact.pushname || autorContact.verifiedName || autorContact.name}, você está temporariamente bloqueado(a) de usar o bot por decisão de um administrador. Por favor, aguarde.`, null, { mentions: [autorContact] });
-        return; 
+        return;
     } else if (tempBlockedUsers[autorId] && tempBlockedUsers[autorId] <= now) {
         delete tempBlockedUsers[autorId];
-        console.log(`Bloqueio temporário de ${autorId} expirou.`);
     }
 
-    // --- 2. Verificação de Bloqueio Permanente ---
     let blockedUsers = [];
     try {
         if (fs.existsSync(arquivoBlockedUsers)) {
-            // Garante que blockedUsers seja um array, mesmo se o arquivo estiver vazio ou corrompido para JSON
             const content = fs.readFileSync(arquivoBlockedUsers, 'utf8');
-            blockedUsers = content ? JSON.parse(content) : []; 
+            blockedUsers = content ? JSON.parse(content) : [];
         }
     } catch (e) {
-        console.error('Erro ao carregar blockedUsers.json para verificação:', e);
-        blockedUsers = []; 
+        console.error('Erro ao carregar blockedUsers.json:', e);
+        blockedUsers = [];
     }
-
     if (blockedUsers.includes(autorId)) {
-        console.log(`Usuário ${autorId} está bloqueado permanentemente. Ignorando.`);
-        return; 
+        return;
     }
 
-    // --- 3. Verificação de SPAM (Automática) ---
+    // --- Verificação de SPAM ---
     const isCommand = msg.body.trim().startsWith('!');
-    
     if (!spamTracker[autorId]) {
-        spamTracker[autorId] = {
-            lastCommandTime: now,
-            commandCount: 0,
-            blockedUntil: 0,
-            spamWarningSent: false
-        };
+        spamTracker[autorId] = { lastCommandTime: now, commandCount: 0, blockedUntil: 0, spamWarningSent: false };
     }
     const userData = spamTracker[autorId];
 
     if (userData.blockedUntil > now) {
-        console.log(`Usuário ${autorId} está temporariamente bloqueado por spam.`);
         if (!userData.spamWarningSent) {
-             await msg.reply(`⚠️ ${autorContact.pushname || autorContact.verifiedName || autorContact.name}, por favor, não flode! Você está temporariamente bloqueado(a) por ${SPAM_BLOCK_DURATION / 1000} segundos.`, null, { mentions: [autorContact] });
-             userData.spamWarningSent = true;
+            await msg.reply(`⚠️ ${autorContact.pushname || autorContact.verifiedName || autorContact.name}, por favor, não flode! Você está temporariamente bloqueado(a) por ${SPAM_BLOCK_DURATION / 1000} segundos.`, null, { mentions: [autorContact] });
+            userData.spamWarningSent = true;
         }
         return;
     } else {
@@ -220,16 +193,17 @@ client.on('message', async (msg) => {
             userData.commandCount = 0;
             userData.lastCommandTime = now;
             userData.spamWarningSent = true;
-            console.log(`Usuário ${autorId} flodou e foi bloqueado por ${SPAM_BLOCK_DURATION / 1000} segundos.`);
             await msg.reply(`⚠️ ${autorContact.pushname || autorContact.verifiedName || autorContact.name}, por favor, não flode! Você está temporariamente bloqueado(a) por ${SPAM_BLOCK_DURATION / 1000} segundos.`, null, { mentions: [autorContact] });
             return;
         }
     }
 
-    if (msg.id.remote.endsWith('@g.us')) { 
+    // --- Lógica Específica para Grupos ---
+    if (msg.id.remote.endsWith('@g.us')) {
         const chat = await msg.getChat();
         const groupId = chat.id._serialized;
-        
+
+        // Salvar tempo e ranking
         let tempoData = carregarJson(arquivoTempo);
         if (!tempoData[groupId]) {
             tempoData[groupId] = {};
@@ -246,6 +220,7 @@ client.on('message', async (msg) => {
             salvarJson(arquivoRanking, rankingData);
         }
 
+        // Lógica do jogo "Mais Provável"
         if (maisProvavelState.isActive && maisProvavelState.groupId === groupId && msg.mentionedIds && msg.mentionedIds.length > 0) {
             const idMencionado = msg.mentionedIds[0];
             const todosParticipantesIds = chat.participants
@@ -261,64 +236,60 @@ client.on('message', async (msg) => {
                 console.log(`[MAIS PROVÁVEL - Erro] ${userId} mencionou um ID inválido para voto.`);
             }
         }
+
+        // --- Lógica para processar a votação de banimento ---
+        const comandoVoto = msg.body.trim().toLowerCase();
+
+        if (comandoVoto === '!votarbanir' && banVote.isActive && banVote.groupId === groupId) {
+            if (!msg.hasQuotedMsg) {
+                msg.reply('⚠️ Para votar, você deve responder à mensagem de votação com `!votarbanir`.');
+                return;
+            }
+
+            const quotedMsg = await msg.getQuotedMessage();
+
+            if (quotedMsg.id._serialized !== banVote.voteMessageId) {
+                return;
+            }
+
+            if (banVote.votes.includes(autorId)) {
+                msg.reply('⚠️ Você já votou nesta rodada.');
+                return;
+            }
+
+            if (autorId === banVote.targetUserId || autorId === banVote.proposerId) {
+                msg.reply('⚠️ Você não pode votar nesta rodada.');
+                return;
+            }
+
+            banVote.votes.push(autorId);
+            const votosAtuais = banVote.votes.length;
+            const votosNecessarios = 10;
+
+            if (votosAtuais >= votosNecessarios) {
+                try {
+                    await chat.removeParticipants([banVote.targetUserId]);
+                    const targetContact = await client.getContactById(banVote.targetUserId);
+                    const replyMessage = `✅ Votação concluída! Com ${votosAtuais} votos, ${targetContact.pushname || targetContact.verifiedName} foi expulso(a) do grupo.`;
+                    await msg.reply(replyMessage, null, { mentions: [targetContact] });
+                } catch (error) {
+                    console.error('Erro ao expulsar membro por votação:', error);
+                    msg.reply('❌ Ocorreu um erro ao expulsar o membro. O bot pode não ter permissão de administrador.');
+                } finally {
+                    banVote.isActive = false;
+                    banVote.groupId = null;
+                    banVote.proposerId = null;
+                    banVote.targetUserId = null;
+                    banVote.voteMessageId = null;
+                    banVote.votes = [];
+                }
+            } else {
+                msg.reply(`🗳️ Voto registrado! Faltam ${votosNecessarios - votosAtuais} votos para o banimento.`);
+            }
+        }
     }
     
-    // --- NOVO: Bloco para processar a votação de banimento ---
-    const chat = await msg.getChat();
-    const groupId = chat.id._serialized;
-    const comandoVoto = msg.body.trim().toLowerCase();
-
-    if (comandoVoto === '!votarbanir' && banVote.isActive && banVote.groupId === groupId) {
-        // Verifica se a mensagem de votação está respondendo à mensagem correta
-        if (!msg.hasQuotedMsg) {
-            msg.reply('⚠️ Para votar, você deve responder à mensagem de votação com `!votarbanir`.');
-            return;
-        }
-        
-        const quotedMsg = await msg.getQuotedMessage();
-        const voteMessageContent = `O membro @${banVote.targetUserName} foi indicado para ser expulso.`;
-        if (!quotedMsg.body.includes(voteMessageContent)) {
-            return; // Ignora se não está respondendo à mensagem correta
-        }
-
-        // Verifica se a pessoa já votou
-        if (banVote.votes.includes(autorId)) {
-            msg.reply('⚠️ Você já votou nesta rodada.');
-            return;
-        }
-        
-        // A pessoa não pode votar em si mesma (se for o alvo) ou no voto que ela mesma iniciou
-        if (autorId === banVote.targetUserId || autorId === banVote.proposerId) {
-            msg.reply('⚠️ Você não pode votar nesta rodada.');
-            return;
-        }
-
-        // Adiciona o voto
-        banVote.votes.push(autorId);
-        const votosAtuais = banVote.votes.length;
-        const votosNecessarios = 10;
-
-        if (votosAtuais >= votosNecessarios) {
-            // Votação aprovada, expulsa o membro
-            try {
-                await chat.removeParticipants([banVote.targetUserId]);
-                msg.reply(`✅ Votação concluída! Com ${votosAtuais} votos, @${banVote.targetUserName} foi expulso(a) do grupo.`);
-            } catch (error) {
-                console.error('Erro ao expulsar membro por votação:', error);
-                msg.reply('❌ Ocorreu um erro ao expulsar o membro. O bot pode não ter permissão de administrador.');
-            } finally {
-                // Reseta o estado da votação
-                banVote.isActive = false;
-                banVote.groupId = null;
-                banVote.proposerId = null;
-                banVote.targetUserId = null;
-                banVote.votes = [];
-            }
-        } else {
-            msg.reply(`🗳️ Voto registrado! Faltam ${votosNecessarios - votosAtuais} votos para o banimento.`);
-        }
-    }
-
+    // --- Lógica de Execução de Comandos ---
     const partes = msg.body.trim().toLowerCase().split(' ');
     const comando = partes[0];
     const args = partes.slice(1);
@@ -328,11 +299,9 @@ client.on('message', async (msg) => {
 
         try {
             if (typeof comandoObj === 'function') {
-                // Passando ownerId para comandos que precisam de permissão de admin
-                await comandoObj(client, msg, args, ownerId); 
+                await comandoObj(client, msg, args, ownerId);
             } else if (typeof comandoObj.execute === 'function') {
-                // Passando ownerId para comandos que precisam de permissão de admin
-                await comandoObj.execute(client, msg, args, ownerId); 
+                await comandoObj.execute(client, msg, args, ownerId);
             } else {
                 await msg.reply('⚠️ Este comando não está corretamente formatado.');
             }

@@ -1,4 +1,3 @@
-// commands/ban.js
 const { banVote } = require('../gameState');
 
 module.exports = {
@@ -50,7 +49,9 @@ module.exports = {
 
             try {
                 await chat.removeParticipants([targetId]);
-                msg.reply(`✅ @${targetUser.id.user} foi expulso(a) do grupo por um administrador.`);
+                const targetContact = await client.getContactById(targetId);
+                const replyMessage = `✅ ${targetContact.pushname || targetContact.verifiedName} foi expulso(a) do grupo por um administrador.`;
+                await msg.reply(replyMessage, null, { mentions: [targetContact] });
             } catch (error) {
                 console.error('Erro ao expulsar membro:', error);
                 msg.reply('❌ Ocorreu um erro ao tentar expulsar o membro. O bot pode não ter permissão de administrador.');
@@ -69,20 +70,24 @@ module.exports = {
             return;
         }
 
-        // Inicia a votação
         banVote.isActive = true;
         banVote.groupId = chat.id._serialized;
         banVote.proposerId = autorId;
         banVote.targetUserId = targetId;
         banVote.targetUserName = targetUser.id.user;
-        banVote.votes = [autorId]; // O proponente já conta como 1 voto
+        banVote.votes = [autorId];
 
-        msg.reply(
-            `🗳️ *Votação para Banir* 🗳️
+        const autorContact = await client.getContactById(autorId);
+        const targetContact = await client.getContactById(targetId);
 
-@${autorParticipant.id.user} condena @${targetUser.id.user} ao exílio!
-Para votar a favor, responda a esta mensagem com *\`!votarbanir\`*
-(1/10 votos necessários para o banimento)`
-        );
+        const mensagemVotacao = `${autorContact.pushname || autorContact.verifiedName} condena: ${targetContact.pushname || targetContact.verifiedName} ao *EXÍLIO*!
+
+Para votar a favor, responda a esta mensagem com **\`!votarbanir\`**.
+(1/10 votos necessários para o banimento)`;
+        
+        const sentMessage = await chat.sendMessage(mensagemVotacao, {
+            mentions: [autorContact, targetContact]
+        });
+        banVote.voteMessageId = sentMessage.id._serialized;
     }
 };

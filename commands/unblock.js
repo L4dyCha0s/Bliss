@@ -59,7 +59,7 @@ module.exports = async (client, msg, args, ownerId) => {
         blockedUsers.splice(index, 1);
         salvarBlockedUsers(blockedUsers);
         await chat.sendMessage(
-            `✅ Usuário @${contatoMencionado.id.user} foi *desbloqueado (permanente)* com sucesso!`,
+            `✅ Usuário @${contatoMencionado.id.user} pagou a fiança de uma Pepsi Black para a Stella e pode usar o Bliss novamente! 😍`,
             { mentions: [contatoMencionado] }
         );
         console.log(`Admin ${autorId} desbloqueou permanentemente ${idMencionado}.`);

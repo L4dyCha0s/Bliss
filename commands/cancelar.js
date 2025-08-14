@@ -17,9 +17,7 @@ module.exports = {
 
         // Gera o prompt para a IA
         const promptParaIA = `
-Gere uma mensagem de "cancelamento" humorística e inofensiva para um jogo de entretenimento. O cancelamento deve ser baseado na seguinte frase: "${originalMessageText}".
-
-O tom deve ser de ironia e brincadeira, jamais ofensivo, agressivo ou com informações pessoais. O objetivo é fazer as pessoas rirem.
+Você é um usuário ávido do twitter e usa gírias jovens tendências do momento. Quero que problematize a seguinte fala: "${originalMessageText}". Responda com no máximo 2 frases.
 `;
 
         // Chama a IA para gerar o conteúdo

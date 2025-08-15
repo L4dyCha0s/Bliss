@@ -6,12 +6,14 @@ module.exports = {
     async execute(client, msg) {
         const chat = await msg.getChat();
 
-        // CORREÇÃO: Verifica se a mensagem foi enviada em um grupo
+        // Verifica se a mensagem foi enviada em um grupo
+        // Se este erro persistir, significa que o chat não está sendo
+        // retornado corretamente como um GroupChat pela API
         if (!chat.isGroup) {
             msg.reply('Este comando só pode ser usado em grupos.');
             return;
         }
-
+        
         if (!msg.hasQuotedMsg) {
             msg.reply('⚠️ Para sugerir uma saidinha, você deve **responder** à mensagem que contém a ficha preenchida com este comando.');
             return;
@@ -32,13 +34,22 @@ module.exports = {
         };
         saidinhaState.push(novaSaidinha);
         
-        // Filtra e pega o ID dos administradores
-        const allParticipants = await chat.getParticipants();
+        // CORREÇÃO AQUI: Acessa os participantes com verificação adicional
+        let allParticipants = [];
+        try {
+            allParticipants = await chat.getParticipants();
+        } catch (e) {
+            console.error('Erro ao obter participantes do grupo:', e);
+            msg.reply('❌ Ocorreu um erro ao buscar os participantes do grupo. A saidinha foi cancelada.');
+            saidinhasState.splice(saidinhasState.findIndex(s => s.id === saidinhaId), 1);
+            return;
+        }
+
         const adms = allParticipants.filter(p => p.isAdmin && p.id._serialized !== client.info.wid._serialized);
         
         if (adms.length === 0) {
             await msg.reply('Sua sugestão foi recebida, mas não há outros administradores para aprová-la. A saidinha foi cancelada.');
-            saidinhaState.splice(saidinhaState.findIndex(s => s.id === saidinhaId), 1);
+            saidinhasState.splice(saidinhasState.findIndex(s => s.id === saidinhaId), 1);
             return;
         }
 
@@ -48,13 +59,13 @@ module.exports = {
 
         let message = `
 ⚠️ Sugestão de Saidinha enviada por @${autorContact.id.user}! ⚠️
-ID do Pedido: #${saidinhaId}
+ID do Pedido: #${saidinhasId}
 
 -----------------------------------
 ${quotedMsg.body}
 -----------------------------------
 
-Um administrador pode aprovar esta sugestão com \`!aprovarsaidinha ${saidinhaId}\` ou recusar com \`!recusarsaidinha ${saidinhaId}\`.
+Um administrador pode aprovar esta sugestão com \`!aprovarsaidinha ${saidinhasId}\` ou recusar com \`!recusarsaidinha ${saidinhasId}\`.
 `;
         
         await chat.sendMessage(message, { mentions: [...mentions, autorContact.id._serialized] });

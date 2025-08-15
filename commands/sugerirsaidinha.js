@@ -1,4 +1,3 @@
-// commands/sugerirsaidinha.js
 const { saidinhaState } = require('../gameState');
 
 module.exports = {
@@ -20,32 +19,43 @@ module.exports = {
         const quotedMsg = await msg.getQuotedMessage();
         const autorId = msg.author || msg.from;
 
-        // Verifica se já há uma saidinha em aprovação
-        if (saidinhaState.isActive) {
-            msg.reply('Já existe uma saidinha aguardando aprovação dos administradores. Por favor, aguarde.');
-            return;
-        }
-        
-        // Armazena a sugestão no estado global
-        saidinhaState.isActive = true;
-        saidinhaState.authorId = autorId;
-        saidinhaState.proposalMessage = quotedMsg;
+        // NOVO: Gera um ID único para esta saidinha
+        const saidinhaId = Date.now().toString();
 
+        // NOVO: Cria um objeto para a saidinha e o adiciona ao array
+        const novaSaidinha = {
+            id: saidinhaId,
+            authorId: autorId,
+            proposalMessage: quotedMsg.body,
+            groupId: chat.id._serialized
+        };
+        saidinhaState.push(novaSaidinha);
+        
         // Filtra e pega o ID dos administradores
-        const adms = chat.participants.filter(p => p.isAdmin && p.id._serialized !== client.info.wid._serialized);
+        const allParticipants = await chat.getParticipants();
+        const adms = allParticipants.filter(p => p.isAdmin && p.id._serialized !== client.info.wid._serialized);
         
         if (adms.length === 0) {
             await msg.reply('Sua sugestão foi recebida, mas não há outros administradores para aprová-la. A saidinha foi cancelada.');
-            saidinhaState.isActive = false;
+            saidinhaState.splice(saidinhaState.findIndex(s => s.id === saidinhaId), 1);
             return;
         }
 
         // Constrói a mensagem para os adms
         const mentions = adms.map(p => p.id._serialized);
-        let message = `⚠️ Sugestão de Saidinha enviada por @${autorId.split('@')[0]}! ⚠️\n\n`;
-        message += 'Um administrador pode aprovar esta sugestão respondendo à mensagem original com `!aprovarsaidinha`.\n\n';
-        message += quotedMsg.body;
+        const autorContact = await client.getContactById(autorId);
+
+        let message = `
+⚠️ Sugestão de Saidinha enviada por @${autorContact.id.user}! ⚠️
+ID do Pedido: #${saidinhaId}
+
+-----------------------------------
+${quotedMsg.body}
+-----------------------------------
+
+Um administrador pode aprovar esta sugestão com \`!aprovarsaidinha ${saidinhaId}\` ou recusar com \`!recusarsaidinha ${saidinhaId}\`.
+`;
         
-        await chat.sendMessage(message, { mentions: [...mentions, autorId] });
+        await chat.sendMessage(message, { mentions: [...mentions, autorContact.id._serialized] });
     }
 };

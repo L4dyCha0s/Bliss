@@ -1,5 +1,28 @@
 // commands/aprovarsaidinha.js
+const fs = require('fs');
+const path = require('path');
 const { saidinhaState } = require('../gameState');
+
+// Caminho do arquivo para salvar as saidinhas aprovadas
+const arquivoSaidinhasAprovadas = path.join(__dirname, '../data', 'saidinhasAprovadas.json');
+
+// Funções auxiliares para ler e salvar JSON (copiadas do seu index.js para manter o comando independente)
+function carregarJson(filePath) {
+    if (fs.existsSync(filePath)) {
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            return content ? JSON.parse(content) : [];
+        } catch (e) {
+            console.error(`Erro ao ler/parsear ${filePath}:`, e);
+            return [];
+        }
+    }
+    return [];
+}
+
+function salvarJson(filePath, data) {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+}
 
 module.exports = {
     name: 'aprovarsaidinha',
@@ -46,8 +69,39 @@ ${saidinhaState.proposalMessage.body}
 *Atenção:* Um administrador deve fixar esta mensagem por 48h para manter todos informados.
 `;
         
-        // Envia a mensagem marcando todos os participantes e limpa o estado
+        // Envia a mensagem marcando todos os participantes
         await chat.sendMessage(saidinhaMessage, { mentions: allMentions });
+
+        // --- NOVO: Lógica para registrar a saidinha no JSON ---
+        const autorSugestao = await client.getContactById(saidinhaState.authorId);
+        const autorAprovacao = await client.getContactById(autorId);
+
+        const novaSaidinha = {
+            id: saidinhaState.proposalMessage.id._serialized,
+            dataHoraAprovacao: new Date().toISOString(),
+            sugestaoPor: {
+                id: saidinhaState.authorId,
+                nome: autorSugestao.pushname || autorSugestao.name
+            },
+            aprovadoPor: {
+                id: autorId,
+                nome: autorAprovacao.pushname || autorAprovacao.name
+            },
+            conteudo: saidinhaState.proposalMessage.body
+        };
+
+        try {
+            const saidinhasAtuais = carregarJson(arquivoSaidinhasAprovadas);
+            saidinhasAtuais.push(novaSaidinha);
+            salvarJson(arquivoSaidinhasAprovadas, saidinhasAtuais);
+            console.log(`✅ Nova saidinha aprovada e salva em ${arquivoSaidinhasAprovadas}`);
+        } catch (error) {
+            console.error('❌ Erro ao salvar a saidinha aprovada:', error);
+            msg.reply('❌ Ocorreu um erro ao registrar a saidinha. Verifique o console.');
+        }
+        // --- FIM DA NOVA LÓGICA ---
+
+        // Limpa o estado após a aprovação
         saidinhaState.isActive = false;
         saidinhaState.authorId = null;
         saidinhaState.proposalMessage = null;

@@ -6,6 +6,7 @@ module.exports = {
     async execute(client, msg) {
         const chat = await msg.getChat();
 
+        // CORREÇÃO: Verifica se a mensagem foi enviada em um grupo
         if (!chat.isGroup) {
             msg.reply('Este comando só pode ser usado em grupos.');
             return;

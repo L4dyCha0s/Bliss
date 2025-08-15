@@ -1,6 +1,9 @@
+// commands/sugerirsaidinha.js
+const { saidinhaState } = require('../gameState');
+
 module.exports = {
     name: 'sugerirsaidinha',
-    description: 'Sugere uma saidinha, marcando os administradores para aprovação. Use como resposta a uma ficha preenchida.',
+    description: 'Sugere uma saidinha respondendo à ficha preenchida.',
     async execute(client, msg) {
         const chat = await msg.getChat();
 
@@ -15,40 +18,34 @@ module.exports = {
         }
 
         const quotedMsg = await msg.getQuotedMessage();
-        const autorId = quotedMsg.author || quotedMsg.from;
+        const autorId = msg.author || msg.from;
 
-        let allParticipants = [];
-        try {
-            allParticipants = await chat.getParticipants();
-        } catch (e) {
-            console.error('Erro ao obter participantes do grupo:', e);
-            msg.reply('❌ Ocorreu um erro ao buscar os participantes do grupo. Por favor, tente novamente.');
+        // Verifica se já há uma saidinha em aprovação
+        if (saidinhaState.isActive) {
+            msg.reply('Já existe uma saidinha aguardando aprovação dos administradores. Por favor, aguarde.');
             return;
         }
         
-        const adms = allParticipants.filter(p => p.isAdmin);
+        // Armazena a sugestão no estado global
+        saidinhaState.isActive = true;
+        saidinhaState.authorId = autorId;
+        saidinhaState.proposalMessage = quotedMsg;
 
+        // Filtra e pega o ID dos administradores
+        const adms = chat.participants.filter(p => p.isAdmin && p.id._serialized !== client.info.wid._serialized);
+        
         if (adms.length === 0) {
-            msg.reply('Sua sugestão foi recebida, mas não há administradores para aprová-la.');
+            await msg.reply('Sua sugestão foi recebida, mas não há outros administradores para aprová-la. A saidinha foi cancelada.');
+            saidinhaState.isActive = false;
             return;
         }
 
+        // Constrói a mensagem para os adms
         const mentions = adms.map(p => p.id._serialized);
-        const autorContact = await client.getContactById(autorId);
+        let message = `⚠️ Sugestão de Saidinha enviada por @${autorId.split('@')[0]}! ⚠️\n\n`;
+        message += 'Um administrador pode aprovar esta sugestão respondendo à mensagem original com `!aprovarsaidinha`.\n\n';
+        message += quotedMsg.body;
         
-        mentions.push(autorContact.id._serialized);
-
-        const saidinhaMessage = `📣 **NOVA SAIDINHA PROPOSTA!** 📣
-A ficha abaixo foi enviada por @${autorContact.id.user} para aprovação.
-
------------------------------------
-${quotedMsg.body}
------------------------------------
-
-Um administrador pode aprovar esta sugestão.
-`;
-        
-        await chat.sendMessage(saidinhasMessage, { mentions: mentions });
-        msg.reply('✅ Sua sugestão foi enviada para os administradores.');
+        await chat.sendMessage(message, { mentions: [...mentions, autorId] });
     }
 };

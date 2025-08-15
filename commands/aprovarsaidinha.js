@@ -5,7 +5,7 @@ const path = require('path');
 // Caminho para o arquivo de saidinhas aprovadas
 const saidinhasFilePath = path.join(__dirname, '..', 'data', 'saidinhasAprovadas.json');
 
-// Funções auxiliares para carregar e salvar JSON
+// Função auxiliar para carregar JSON
 function carregarJson(filePath) {
     if (fs.existsSync(filePath)) {
         try {
@@ -19,113 +19,81 @@ function carregarJson(filePath) {
     return {}; 
 }
 
+// Função auxiliar para salvar JSON
 function salvarJson(filePath, data) {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
 }
 
-// Função para extrair dados da ficha
-function parseSaidinhaData(messageBody) {
-    const data = {};
-    const lines = messageBody.split('\n');
-    lines.forEach(line => {
-        const [key, ...value] = line.split(':');
-        if (key && value.length > 0) {
-            data[key.trim().toLowerCase().replace(/ /g, '')] = value.join(':').trim();
-        }
-    });
-    return data;
-}
-
 module.exports = {
-    name: 'aprovarsaidinha',
-    description: 'Aprova uma saidinha pendente. Use: `!aprovarsaidinha <id>`',
-    async execute(client, msg, args) {
-        const saidinhaId = args[0];
-        const autorId = msg.author || msg.from;
+    name: 'aprovarsaidinha',
+    description: 'Aprova uma saidinha e a envia para o grupo.',
+    async execute(client, msg) {
+        const chat = await msg.getChat();
+        const autorId = msg.author || msg.from;
+        
+        // Verifica se a mensagem foi enviada em um grupo
+        if (!chat.isGroup) {
+            msg.reply('Este comando só pode ser usado em grupos.');
+            return;
+        }
 
-        const chat = await msg.getChat();
-        
-        // 1. Verificação: Mensagem em grupo
-        if (!chat.isGroup) {
-            msg.reply('Este comando só pode ser usado em grupos.');
-            return;
-        }
+        // Verifica se o autor é um administrador
+        const participant = chat.participants.find(p => p.id._serialized === autorId);
+        if (!participant || !participant.isAdmin) {
+            msg.reply('Apenas administradores podem aprovar uma saidinha.');
+            return;
+        }
 
-        // 2. Verificação: Autor é administrador
-        const participant = chat.participants.find(p => p.id._serialized === autorId);
-        if (!participant || !participant.isAdmin) {
-            msg.reply('❌ Apenas administradores podem aprovar saidinhas.');
-            return;
-        }
+        // Verifica se há uma saidinha para aprovar
+        if (!saidinhaState.isActive || !saidinhaState.proposalMessage) {
+            msg.reply('Não há nenhuma sugestão de saidinha aguardando aprovação no momento.');
+            return;
+        }
 
-        // 3. Verificação: ID foi fornecido
-        if (!saidinhaId) {
-            msg.reply('⚠️ Você deve fornecer o ID da saidinha que deseja aprovar. Use `!saidinhaspendentes` para ver a lista.');
-            return;
-        }
+        // Verifica se o comando está respondendo à mensagem correta
+        if (!msg.hasQuotedMsg || msg.getQuotedMessage()._data.id._serialized !== saidinhaState.proposalMessage.id._serialized) {
+            msg.reply('⚠️ Você deve **responder** à mensagem de sugestão da saidinha para aprová-la.');
+            return;
+        }
 
-        const saidinhaIndex = saidinhaState.findIndex(s => s.id === saidinhaId);
+        // Obtém todos os participantes do grupo para marcar
+        const allParticipants = chat.participants.filter(p => p.id._serialized !== client.info.wid._serialized);
+        const allMentions = allParticipants.map(p => p.id._serialized);
 
-        // 4. Verificação: Saidinha com o ID existe
-        if (saidinhaIndex === -1) {
-            msg.reply(`❌ Não há nenhuma sugestão de saidinha com o ID #${saidinhaId} aguardando aprovação.`);
-            return;
-        }
-
-        const saidinhaAprovada = saidinhaState[saidinhasIndex];
-
-        // 5. Verificação robusta para obter os participantes
-        let allParticipants = [];
-        try {
-            allParticipants = await chat.getParticipants();
-        } catch (e) {
-            console.error('Erro ao obter participantes do grupo:', e);
-            msg.reply('❌ Ocorreu um erro ao buscar os participantes do grupo. A saidinha não pode ser aprovada.');
-            return;
-        }
-        const allMentions = allParticipants.map(p => p.id._serialized);
-
-        const saidinhaMessage = `🎉 **SAIDINHA APROVADA!** 🎉
+        const saidinhaMessage = `
+🎉🎉 **SAIDINHA APROVADA!** 🎉🎉
 A sugestão de saidinha foi aprovada e está confirmada!
 
------------------------------------
-${saidinhaAprovada.proposalMessage}
------------------------------------
+${saidinhaState.proposalMessage.body}
 
-*Atenção:* Um administrador deve fixar esta mensagem para manter todos informados.
+*Atenção:* Um administrador deve fixar esta mensagem por 48h para manter todos informados.
 `;
-        
-        await chat.sendMessage(saidinhasMessage, { mentions: allMentions });
+        
+        // Envia a mensagem marcando todos os participantes e limpa o estado
+        await chat.sendMessage(saidinhasMessage, { mentions: allMentions });
+        
+        // ============ INÍCIO DA LÓGICA DE SALVAR NO ARQUIVO ============
+        const saidinhasData = carregarJson(saidinhasFilePath);
+        const groupId = chat.id._serialized;
 
-        // === LÓGICA DE SALVAR NO ARQUIVO ===
-        const saidinhasData = carregarJson(saidinhasFilePath);
-        const groupId = saidinhaAprovada.groupId;
+        if (!saidinhasData[groupId]) {
+            saidinhasData[groupId] = [];
+        }
 
-        if (!saidinhasData[groupId]) {
-            saidinhasData[groupId] = [];
-        }
-        
-        const ficha = parseSaidinhaData(saidinhasAprovada.proposalMessage);
-        
-        const saidinhaSalva = {
-            id: saidinhaAprovada.id,
-            authorId: saidinhaAprovada.authorId,
-            authorUser: (await client.getContactById(saidinhaAprovada.authorId)).pushname, // Nome do responsável
-            date: ficha.data,
-            time: ficha.hora,
-            location: ficha.local,
-            description: ficha.descrição,
-            // ... adicione outros campos da ficha aqui ...
-        };
+        // Prepara os dados para salvar
+        const saidinhaSalva = {
+            id: saidinhaState.proposalMessage.id._serialized, // Usando o ID da mensagem como ID da saidinha
+            authorId: saidinhaState.authorId,
+            proposalMessage: saidinhaState.proposalMessage.body,
+            approvedDate: new Date().toISOString()
+        };
+        
+        saidinhasData[groupId].push(saidinhasSalva);
+        salvarJson(saidinhasFilePath, saidinhasData);
+        // ============ FIM DA LÓGICA DE SALVAR NO ARQUIVO ============
 
-        saidinhasData[groupId].push(saidinhasSalva);
-        salvarJson(saidinhasFilePath, saidinhasData);
-        // === FIM DA LÓGICA DE SALVAR ===
-
-        // Remove a saidinha aprovada do array
-        saidinhaState.splice(saidinhasIndex, 1); 
-
-        // Mensagem de confirmação para o admin
-        msg.reply(`✅ Saidinha #${saidinhaId} aprovada com sucesso e enviada ao grupo.`);
-    }
+        saidinhaState.isActive = false;
+        saidinhaState.authorId = null;
+        saidinhaState.proposalMessage = null;
+    }
 };

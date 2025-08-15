@@ -1,4 +1,3 @@
-// commands/saidinhalist.js
 const fs = require('fs');
 const path = require('path');
 
@@ -20,7 +19,7 @@ function carregarJson(filePath) {
 
 module.exports = {
     name: 'saidinhalist',
-    description: 'Visualiza um resumo das saidinhas aprovadas, organizadas por data e com os responsáveis.',
+    description: 'Visualiza as saidinhas aprovadas para este grupo.',
     async execute(client, msg) {
         const chat = await msg.getChat();
         const groupId = chat.id._serialized;
@@ -29,29 +28,30 @@ module.exports = {
         const saidinhasDoGrupo = saidinhasData[groupId] || [];
 
         if (saidinhasDoGrupo.length === 0) {
-            msg.reply('Não há nenhuma saidinha aprovada para este grupo ainda. Que tal propor uma com `!sugerirsaidinha`?');
+            msg.reply('Não há nenhuma saidinha aprovada para este grupo ainda.');
             return;
         }
 
-        // 1. Organizar as saidinhas por data cronológica
-        saidinhasDoGrupo.sort((a, b) => new Date(a.date) - new Date(b.date));
+        // Ordena as saidinhas por data de aprovação (da mais antiga para a mais nova)
+        saidinhasDoGrupo.sort((a, b) => new Date(a.approvedDate) - new Date(b.approvedDate));
 
-        // 2. Formatar a lista para a mensagem de resposta
         let mensagem = '📅 *Saidinhas Aprovadas* 📅\n\n';
+        const mentions = [];
 
-        saidinhasDoGrupo.forEach(saidinha => {
-            const dataFormatada = new Date(saidinha.date).toLocaleDateString('pt-BR');
-            mensagem += `🗓️ **Data:** ${dataFormatada}\n`;
-            mensagem += `📍 **Local:** ${saidinha.location}\n`;
-            mensagem += `🙋 **Responsável(eis):** @${saidinha.authorUser}\n`;
-            mensagem += `📝 **Descrição:** ${saidinha.description}\n\n`;
-        });
+        for (const saidinha of saidinhasDoGrupo) {
+            const dataAprovacao = new Date(saidinha.approvedDate).toLocaleDateString('pt-BR');
+            const autorContact = await client.getContactById(saidinha.authorId);
+            const autorPushname = autorContact ? autorContact.pushname : 'Desconhecido';
+            
+            mensagem += `✅ *Aprovada em:* ${dataAprovacao}\n`;
+            mensagem += `🙋 *Proponente:* @${autorContact.id.user} (${autorPushname})\n`;
+            mensagem += `📝 *Proposta:* ${saidinha.proposalMessage}\n\n`;
 
-        // 3. Enviar a mensagem para o grupo
-        // RECOMENDAÇÃO: A lista de menções agora busca os contatos de forma assíncrona e segura
-        const mentionsPromises = saidinhasDoGrupo.map(s => client.getContactById(s.authorId));
-        const mentions = await Promise.all(mentionsPromises);
-
+            if (autorContact) {
+                mentions.push(autorContact);
+            }
+        }
+        
         await msg.reply(mensagem, null, { mentions: mentions });
     }
 };

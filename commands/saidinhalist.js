@@ -4,7 +4,7 @@ const path = require('path');
 
 const saidinhasFilePath = path.join(__dirname, '..', 'data', 'saidinhasAprovadas.json');
 
-// Função auxiliar para carregar JSON (pode ser a mesma que você já tem no index.js)
+// Função auxiliar para carregar JSON
 function carregarJson(filePath) {
     if (fs.existsSync(filePath)) {
         try {
@@ -29,11 +29,11 @@ module.exports = {
         const saidinhasDoGrupo = saidinhasData[groupId] || [];
 
         if (saidinhasDoGrupo.length === 0) {
-            msg.reply('Não há nenhuma saidinha aprovada para este grupo ainda. Que tal propor uma com `!saidinha`?');
+            msg.reply('Não há nenhuma saidinha aprovada para este grupo ainda. Que tal propor uma com `!sugerirsaidinha`?');
             return;
         }
 
-        // 1. Organizar as saidinhas por data cronológica (da mais antiga para a mais nova)
+        // 1. Organizar as saidinhas por data cronológica
         saidinhasDoGrupo.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         // 2. Formatar a lista para a mensagem de resposta
@@ -48,12 +48,9 @@ module.exports = {
         });
 
         // 3. Enviar a mensagem para o grupo
-        // A lista de menções precisa ser dinâmica
-        const mentions = saidinhasDoGrupo.map(s => {
-            // Supondo que saidinha.authorId é o ID serializado
-            const contact = { id: { _serialized: s.authorId, user: s.authorUser } };
-            return contact;
-        });
+        // RECOMENDAÇÃO: A lista de menções agora busca os contatos de forma assíncrona e segura
+        const mentionsPromises = saidinhasDoGrupo.map(s => client.getContactById(s.authorId));
+        const mentions = await Promise.all(mentionsPromises);
 
         await msg.reply(mensagem, null, { mentions: mentions });
     }

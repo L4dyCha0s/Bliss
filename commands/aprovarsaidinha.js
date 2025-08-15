@@ -23,7 +23,7 @@ function salvarJson(filePath, data) {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
 }
 
-// NOVO: Função para extrair dados da ficha (adapte se necessário)
+// Função para extrair dados da ficha
 function parseSaidinhaData(messageBody) {
     const data = {};
     const lines = messageBody.split('\n');
@@ -40,26 +40,49 @@ module.exports = {
     name: 'aprovarsaidinha',
     description: 'Aprova uma saidinha pendente. Use: `!aprovarsaidinha <id>`',
     async execute(client, msg, args) {
-        // ... (o código de verificação de admin, ID, etc. que já temos) ...
-
         const saidinhaId = args[0];
         const autorId = msg.author || msg.from;
 
         const chat = await msg.getChat();
         
-        // ... (resto das verificações) ...
+        // 1. Verificação: Mensagem em grupo
+        if (!chat.isGroup) {
+            msg.reply('Este comando só pode ser usado em grupos.');
+            return;
+        }
+
+        // 2. Verificação: Autor é administrador
+        const participant = chat.participants.find(p => p.id._serialized === autorId);
+        if (!participant || !participant.isAdmin) {
+            msg.reply('❌ Apenas administradores podem aprovar saidinhas.');
+            return;
+        }
+
+        // 3. Verificação: ID foi fornecido
+        if (!saidinhaId) {
+            msg.reply('⚠️ Você deve fornecer o ID da saidinha que deseja aprovar. Use `!saidinhaspendentes` para ver a lista.');
+            return;
+        }
 
         const saidinhaIndex = saidinhaState.findIndex(s => s.id === saidinhaId);
 
+        // 4. Verificação: Saidinha com o ID existe
         if (saidinhaIndex === -1) {
             msg.reply(`❌ Não há nenhuma sugestão de saidinha com o ID #${saidinhaId} aguardando aprovação.`);
             return;
         }
 
-        const saidinhaAprovada = saidinhaState[saidinhaIndex];
+        const saidinhaAprovada = saidinhaState[saidinhasIndex];
 
-        // Obtém todos os participantes do grupo para marcar
-        const allParticipants = await chat.getParticipants();
+        // 5. Verificação robusta para obter os participantes
+        let allParticipants = [];
+        try {
+            allParticipants = await chat.getParticipants();
+        } catch (e) {
+            console.error('Erro ao obter participantes do grupo:', e);
+            msg.reply('❌ Ocorreu um erro ao buscar os participantes do grupo. A saidinha não pode ser aprovada.');
+            return;
+        }
         const allMentions = allParticipants.map(p => p.id._serialized);
 
         const saidinhaMessage = `🎉 **SAIDINHA APROVADA!** 🎉
@@ -69,11 +92,10 @@ A sugestão de saidinha foi aprovada e está confirmada!
 ${saidinhaAprovada.proposalMessage}
 -----------------------------------
 
-*Atenção:* Um administrador deve fixar esta mensagem por 48h para manter todos informados.
+*Atenção:* Um administrador deve fixar esta mensagem para manter todos informados.
 `;
         
-        // Envia a mensagem marcando todos os participantes
-        await chat.sendMessage(saidinhaMessage, { mentions: allMentions });
+        await chat.sendMessage(saidinhasMessage, { mentions: allMentions });
 
         // === LÓGICA DE SALVAR NO ARQUIVO ===
         const saidinhasData = carregarJson(saidinhasFilePath);
@@ -83,7 +105,7 @@ ${saidinhaAprovada.proposalMessage}
             saidinhasData[groupId] = [];
         }
         
-        const ficha = parseSaidinhaData(saidinhaAprovada.proposalMessage);
+        const ficha = parseSaidinhaData(saidinhasAprovada.proposalMessage);
         
         const saidinhaSalva = {
             id: saidinhaAprovada.id,
@@ -96,12 +118,12 @@ ${saidinhaAprovada.proposalMessage}
             // ... adicione outros campos da ficha aqui ...
         };
 
-        saidinhasData[groupId].push(saidinhaSalva);
+        saidinhasData[groupId].push(saidinhasSalva);
         salvarJson(saidinhasFilePath, saidinhasData);
         // === FIM DA LÓGICA DE SALVAR ===
 
         // Remove a saidinha aprovada do array
-        saidinhaState.splice(saidinhaIndex, 1); 
+        saidinhaState.splice(saidinhasIndex, 1); 
 
         // Mensagem de confirmação para o admin
         msg.reply(`✅ Saidinha #${saidinhaId} aprovada com sucesso e enviada ao grupo.`);

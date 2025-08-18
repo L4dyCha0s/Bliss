@@ -73,16 +73,6 @@ fs.readdirSync(comandosPath).forEach(file => {
     }
 });
 
-const comandosSec = path.join(__dirname, 'commandsec'); 
-
-fs.readdirSync(comandosPath).forEach(file => {
-    if (file.endsWith('.js')) {
-        const comando = require(path.join(comandosSec, file));
-        const nome = '!' + file.replace('.js', '');
-        comandos.set(nome, comando);
-    }
-});
-
 client.on('qr', qr => {
     qrcode.generate(qr, { small: true });
     console.log('📱 Escaneie o QR code com o WhatsApp do número do bot.');

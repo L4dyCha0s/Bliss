@@ -7,7 +7,7 @@ module.exports = async (client, msg, args = []) => {
         return;
     }
 
-    // Verifica se quem enviou é admin
+    // Verifica se quem enviou é admin //
     const isAdmin = chat.participants.some(p =>
         (msg.author || msg.from) === p.id._serialized && p.isAdmin
     );

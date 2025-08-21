@@ -1,5 +1,5 @@
 // commands/fanfic.js
-const { gerarTextoGemini } = require('../serviço-gemini');
+const { gerarConteudoComGemini } = require('../serviço-gemini');
 
 module.exports = {
     name: 'fanfic',
@@ -98,7 +98,7 @@ Use os nomes dos personagens naturalmente no texto.
 `;
 
             try {
-                let fanfic = await gerarTextoGemini(prompt);
+                let fanfic = await gerarConteudoComGemini(prompt);
 
                 if (!fanfic || fanfic.trim() === '') {
                     throw new Error('Resposta vazia do Gemini');

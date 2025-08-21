@@ -37,7 +37,6 @@ Para falar comigo use !bliss. (Sou uma IA para interações leves)
 *!horoscopo*
 *!lembrete*
 *!meusigno*
-*!pdf*
 *!ranking* 
 *!resumo* 
 *!sorteio* 

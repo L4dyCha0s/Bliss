@@ -3,25 +3,65 @@ module.exports = {
     name: 'saidinha',
     description: 'Envia um modelo para sugerir um role para o grupo.',
     async execute(client, msg) {
-        const helpMessage = `🎉 *Sugerir uma Saidinha* 🎉
+        try {
+            const chat = await msg.getChat();
+            
+            if (!chat.isGroup) {
+                return msg.reply('Este comando só funciona em grupos!');
+            }
 
-Para sugerir um role, siga os passos:
+            // Ficha de saidinha simplificada
+            const ficha = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1.  *Preencha a ficha de saidinha:* Copie, preencha e envie a ficha abaixo no grupo.
+📛 *NOME DO ROLE:* 
 
-    -----------------------------------
-    *Nome:* [Dê um nome criativo para o role!]
-    *Data:* 
-    *Hora:* 
-    *Local:* [Onde vamos?]
-    *Estilo:* [Ex: Barzinho, Cinema, etc.]
-    *Descrição:* [Comente o role em si]
-    *Ponto de Encontro:* 
-    -----------------------------------
+📅 *DATA:* 
 
-2.  *Sugira a saidinha:* **Responda** à sua própria mensagem com a ficha preenchida e use o comando \`!sugerirsaidinha\`. O bot marcará todos os administradores para aprovação.
-`;
+⏰ *HORA:* 
 
-        await msg.reply(helpMessage);
+📍 *LOCAL:* 
+
+🏷️ *ESTILO:* 
+
+📝 *DESCRIÇÃO:* 
+
+🚩 *PONTO DE ENCONTRO:* 
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            `.trim();
+
+            // Instruções separadas
+            const instrucoes = `
+*COMO SUGERIR UMA SAIDINHA:*
+
+1. *PREECHER A FICHA:* 
+   • Copie a ficha acima
+   • Preencha TODOS os campos
+   • Envie no grupo
+
+2. *SUGERIR PARA APROVAÇÃO:*
+   • *Responda* à sua mensagem com a ficha preenchida
+   • Use o comando: !sugsaidinha
+   • Os ADMs serão marcados automaticamente
+
+3. *CONSULTAR:*
+   • !saidinhalist - Ver saidinhas aprovadas
+   • !saidinhaspendentes - Ver pendentes (apenas ADMs)
+
+💡 *DICA:* Seja claro e objetivo no preenchimento!
+            `.trim();
+
+            // Enviar a ficha primeiro
+            await msg.reply(ficha);
+            
+            // Enviar instruções em mensagem separada
+            await new Promise(resolve => setTimeout(resolve, 500)); // Pequeno delay
+            await msg.reply(instrucoes);
+
+        } catch (error) {
+            console.error('Erro no comando saidinha:', error);
+            await msg.reply('❌ Ocorreu um erro ao gerar o formulário de saidinha.');
+        }
     }
 };

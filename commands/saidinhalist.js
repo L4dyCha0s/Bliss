@@ -2,59 +2,60 @@
 const fs = require('fs');
 const path = require('path');
 
-const saidinhasFilePath = path.join(__dirname, '..', 'data', 'saidinhasAprovadas.json');
-
-// Função auxiliar para carregar JSON (pode ser a mesma que você já tem no index.js)
-function carregarJson(filePath) {
-    if (fs.existsSync(filePath)) {
-        try {
-            const content = fs.readFileSync(filePath, 'utf8');
-            return content ? JSON.parse(content) : {}; 
-        } catch (e) {
-            console.error(`Erro ao ler/parsear ${filePath}:`, e);
-            return {}; 
-        }
-    }
-    return {}; 
-}
+const saidinhasPath = path.join(__dirname, '..', 'data', 'saidinhas.json');
 
 module.exports = {
     name: 'saidinhalist',
-    description: 'Visualiza um resumo das saidinhas aprovadas, organizadas por data e com os responsáveis.',
+    description: 'Lista todas as saidinhas aprovadas',
     async execute(client, msg) {
-        const chat = await msg.getChat();
-        const groupId = chat.id._serialized;
+        try {
+            const chat = await msg.getChat();
+            
+            if (!chat.isGroup) {
+                return msg.reply('Este comando só funciona em grupos!');
+            }
 
-        const saidinhasData = carregarJson(saidinhasFilePath);
-        const saidinhasDoGrupo = saidinhasData[groupId] || [];
+            if (!fs.existsSync(saidinhasPath)) {
+                return msg.reply('📭 Nenhuma saidinha aprovada ainda!');
+            }
 
-        if (saidinhasDoGrupo.length === 0) {
-            msg.reply('Não há nenhuma saidinha aprovada para este grupo ainda. Que tal propor uma com `!saidinha`?');
-            return;
+            const saidinhas = JSON.parse(fs.readFileSync(saidinhasPath, 'utf8'));
+            const groupId = chat.id._serialized;
+            const saidinhasGrupo = saidinhas[groupId];
+
+            if (!saidinhasGrupo || Object.keys(saidinhasGrupo).length === 0) {
+                return msg.reply('📭 Nenhuma saidinha aprovada para este grupo!');
+            }
+
+            // Agrupar por data de aprovação
+            const saidinhasPorData = {};
+            Object.values(saidinhasGrupo).forEach(saidinha => {
+                const data = new Date(saidinha.dataAprovacao).toLocaleDateString('pt-BR');
+                if (!saidinhasPorData[data]) {
+                    saidinhasPorData[data] = [];
+                }
+                saidinhasPorData[data].push(saidinha);
+            });
+
+            // Criar resposta
+            let resposta = '📅 *SAIDINHAS APROVADAS - RESUMO POR DATA*\n\n';
+            
+            Object.entries(saidinhasPorData).forEach(([data, saidinhasData]) => {
+                resposta += `📅 *${data}:*\n`;
+                saidinhasData.forEach(saidinha => {
+                    const titulo = saidinha.texto.split('*NOME DO ROLE:*')[1]?.split('\n')[0]?.trim() || 'Saída sem nome';
+                    resposta += `• ${titulo} (por @${saidinha.autor.name})\n`;
+                });
+                resposta += '\n';
+            });
+
+            resposta += `📊 Total: ${Object.keys(saidinhasGrupo).length} saidinha(s) aprovada(s)`;
+
+            await msg.reply(resposta);
+
+        } catch (error) {
+            console.error('Erro no comando saidinhalist:', error);
+            await msg.reply('❌ Ocorreu um erro ao listar as saidinhas.');
         }
-
-        // 1. Organizar as saidinhas por data cronológica (da mais antiga para a mais nova)
-        saidinhasDoGrupo.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-        // 2. Formatar a lista para a mensagem de resposta
-        let mensagem = '📅 *Saidinhas Aprovadas* 📅\n\n';
-
-        saidinhasDoGrupo.forEach(saidinha => {
-            const dataFormatada = new Date(saidinha.date).toLocaleDateString('pt-BR');
-            mensagem += `🗓️ **Data:** ${dataFormatada}\n`;
-            mensagem += `📍 **Local:** ${saidinha.location}\n`;
-            mensagem += `🙋 **Responsável(eis):** @${saidinha.authorUser}\n`;
-            mensagem += `📝 **Descrição:** ${saidinha.description}\n\n`;
-        });
-
-        // 3. Enviar a mensagem para o grupo
-        // A lista de menções precisa ser dinâmica
-        const mentions = saidinhasDoGrupo.map(s => {
-            // Supondo que saidinha.authorId é o ID serializado
-            const contact = { id: { _serialized: s.authorId, user: s.authorUser } };
-            return contact;
-        });
-
-        await msg.reply(mensagem, null, { mentions: mentions });
     }
 };

@@ -1,5 +1,5 @@
 module.exports = async (client, msg) => {
-  const ficha = `🏳️‍🌈 APRESENTAÇÃO 🏳️‍🌈
+  const ficha = `APRESENTAÇÃO 🍹
 
 ❖ Foto:
 ❖ Nome:

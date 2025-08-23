@@ -31,6 +31,7 @@ Para falar comigo use !bliss. (Sou uma IA para interações leves)
 *!cms* (comandosolo)
 *!conselho* 
 *!d20* - *!d20dt* - *!d6*
+*!debate*
 *!duolingo*
 *!faq*
 *!fanfic* (até 5 @)

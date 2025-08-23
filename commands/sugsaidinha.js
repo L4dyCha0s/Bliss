@@ -22,14 +22,15 @@ module.exports = {
 
             const quotedMsg = await msg.getQuotedMessage();
             
-            // Verificar se a mensagem respondida é do mesmo usuário
-            if (quotedMsg.author !== msg.author) {
+            // CORREÇÃO: Verificar autor corretamente para WhatsApp Web.js
+            if (quotedMsg.from !== msg.from) {
                 return msg.reply('❌ Você só pode sugerir saidinhas com suas próprias fichas!');
             }
 
             const fichaTexto = quotedMsg.body;
             
-            if (!fichaTexto || fichaTexto.length < 100) {
+            // CORREÇÃO: Verificar se fichaTexto é realmente uma string
+            if (!fichaTexto || typeof fichaTexto !== 'string' || fichaTexto.length < 100) {
                 return msg.reply('❌ A ficha parece incompleta! Preencha todos os campos.');
             }
 
@@ -46,7 +47,7 @@ module.exports = {
             const autor = await msg.getContact();
             const autorInfo = {
                 id: autor.id._serialized,
-                name: autor.name || autor.pushname || autor.number
+                name: autor.name || autor.pushname || autor.number || 'Usuário'
             };
 
             // Salvar sugestão pendente
@@ -67,16 +68,23 @@ module.exports = {
 
             // Marcar administradores
             const admins = chat.participants.filter(p => p.isAdmin);
-            const mentions = admins.map(admin => `@${admin.id.user}`).join(' ');
+            
+            // CORREÇÃO: Garantir que as menções sejam tratadas corretamente
+            const mentions = admins.map(admin => {
+                const userId = admin.id.user || admin.id._serialized.split('@')[0];
+                return `@${userId}`;
+            }).join(' ');
 
             await msg.reply(
                 `✅ *SUGESTÃO DE SAIDINHA ENVIADA!* ${mentions}\n\n` +
-                `📋 *Sugerido por:* @${autorInfo.name}\n` +
+                `📋 *Sugerido por:* ${autorInfo.name}\n` +
                 `🆔 *ID:* ${saidinhaId}\n\n` +
                 `*FICHA:*\n${fichaTexto}\n\n` +
                 `👮 *ADMs:* Use !apvsaidinha ${saidinhaId} para aprovar\n` +
                 `❌ Ou !repsaidinha ${saidinhaId} [motivo] para reprovar`,
-                { mentions: admins.map(admin => admin.id._serialized) }
+                { 
+                    mentions: admins.map(admin => admin.id._serialized) 
+                }
             );
 
         } catch (error) {

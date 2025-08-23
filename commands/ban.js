@@ -15,7 +15,7 @@ module.exports = {
         const mentionedIds = msg.mentionedIds;
         let targetId;
 
-        if (mentionedIds.length > 0) {
+        if (mentionedIds && mentionedIds.length > 0) {
             targetId = mentionedIds[0];
         } else {
             msg.reply('⚠️ Você deve marcar o membro que deseja expulsar. Ex: `!ban @membro`');
@@ -31,7 +31,7 @@ module.exports = {
 
         // Não permite banir o próprio bot
         if (targetId === client.info.wid._serialized) {
-            msg.reply('Eu não posso me expulsar!');
+            msg.reply('🤖 Eu não posso me expulsar!');
             return;
         }
 
@@ -50,7 +50,7 @@ module.exports = {
             try {
                 await chat.removeParticipants([targetId]);
                 const targetContact = await client.getContactById(targetId);
-                const replyMessage = `✅ ${targetContact.pushname || targetContact.verifiedName} foi expulso(a) do grupo por um administrador.`;
+                const replyMessage = `⚡ *BANIMENTO INSTANTÂNEO*\n\n✅ ${targetContact.pushname || targetContact.verifiedName} foi expulso(a) do grupo por um administrador.`;
                 await msg.reply(replyMessage, null, { mentions: [targetContact] });
             } catch (error) {
                 console.error('Erro ao expulsar membro:', error);
@@ -70,24 +70,71 @@ module.exports = {
             return;
         }
 
+        // Verificar se o alvo não é o próprio autor
+        if (targetId === autorId) {
+            msg.reply('❌ Você não pode iniciar uma votação para se banir!');
+            return;
+        }
+
+        // Inicializar votação
         banVote.isActive = true;
         banVote.groupId = chat.id._serialized;
         banVote.proposerId = autorId;
         banVote.targetUserId = targetId;
-        banVote.targetUserName = targetUser.id.user;
-        banVote.votes = [autorId];
+        banVote.targetUserContact = targetUser;
+        banVote.votes = [autorId]; // Autor vota automaticamente
+        banVote.startTime = Date.now();
+        banVote.timeoutDuration = 10 * 60 * 1000; // 10 minutos
 
         const autorContact = await client.getContactById(autorId);
         const targetContact = await client.getContactById(targetId);
 
-        const mensagemVotacao = `${autorContact.pushname || autorContact.verifiedName} condena: ${targetContact.pushname || targetContact.verifiedName} ao *EXÍLIO*!
+        const mensagemVotacao = `⚖️ *VOTAÇÃO DE BANIMENTO INICIADA!*\n\n` +
+            `👤 *Acusador:* ${autorContact.pushname || autorContact.verifiedName}\n` +
+            `🎯 *Acusado:* ${targetContact.pushname || targetContact.verifiedName}\n\n` +
+            `🗳️ *Para votar a favor do banimento, responda esta mensagem com:*\n` +
+            `**\`!votarbanir\`**\n\n` +
+            `📊 *Votos atuais:* 1/10 necessários\n` +
+            `⏰ *Tempo restante:* 10 minutos\n\n` 
 
-Para votar a favor, responda a esta mensagem com **\`!votarbanir\`**.
-(1/10 votos necessários para o banimento)`;
-        
         const sentMessage = await chat.sendMessage(mensagemVotacao, {
-            mentions: [autorContact, targetContact]
+            mentions: [targetContact]
         });
+        
         banVote.voteMessageId = sentMessage.id._serialized;
+
+        // Timer para expirar a votação
+        banVote.timeout = setTimeout(async () => {
+            if (banVote.isActive && banVote.groupId === chat.id._serialized) {
+                banVote.isActive = false;
+                
+                if (banVote.votes.length >= 10) {
+                    try {
+                        await chat.removeParticipants([targetId]);
+                        await chat.sendMessage(
+                            `⏰ *VOTAÇÃO ENCERRADA - BANIMENTO APROVADO!*\n\n` +
+                            `✅ ${targetContact.pushname || targetContact.verifiedName} foi expulso(a) do grupo por votação popular.\n` +
+                            `📊 Resultado: ${banVote.votes.length}/10 votos`,
+                            { mentions: [targetContact] }
+                        );
+                    } catch (error) {
+                        console.error('Erro ao expulsar por votação:', error);
+                        await chat.sendMessage('❌ Erro ao executar o banimento. O bot pode não ter permissões.');
+                    }
+                } else {
+                    await chat.sendMessage(
+                        `⏰ *VOTAÇÃO ENCERRADA - BANIMENTO REPROVADO!*\n\n` +
+                        `❌ Votação de banimento de ${targetContact.pushname || targetContact.verifiedName} fracassou.\n` +
+                        `📊 Resultado: ${banVote.votes.length}/10 votos (necessário 10)`,
+                        { mentions: [targetContact] }
+                    );
+                }
+                
+                // Resetar estado da votação
+                banVote.isActive = false;
+                banVote.groupId = null;
+                banVote.votes = [];
+            }
+        }, banVote.timeoutDuration);
     }
 };

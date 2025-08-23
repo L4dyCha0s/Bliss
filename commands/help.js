@@ -28,12 +28,14 @@ Para falar comigo use !bliss. (Sou uma IA para interações leves)
 *!aniversarios*
 *!cancelar*
 *!citações*
-*!comandosolo*
+*!cms* (comandosolo)
 *!conselho* 
 *!d20* - *!d20dt* - *!d6*
 *!duolingo*
 *!faq*
+*!fanfic* (até 5 @)
 *!ficha*
+*!fofoca*
 *!horoscopo*
 *!lembrete*
 *!meusigno*

@@ -13,7 +13,8 @@ const {
     SPAM_BLOCK_DURATION,
     tempBlockedUsers,
     tempMutedUsers,
-    banVote
+    banVote,
+    resetBanVote // ✅ Adicionado
 } = require('./gameState');
 // --- Fim das Importações de Módulos ---
 
@@ -113,6 +114,14 @@ Aproveite o grupo! 😉
     }
 });
 
+// ✅ ADICIONADO: Evento para resetar votação quando alguém sair do grupo
+client.on('group_leave', async (notification) => {
+    if (banVote.isActive && banVote.groupId === notification.chatId) {
+        resetBanVote();
+        console.log('Votação de banimento resetada devido a saída de membro');
+    }
+});
+
 client.on('message', async (msg) => {
     if (msg.fromMe) return;
 
@@ -196,6 +205,23 @@ client.on('message', async (msg) => {
             await msg.reply(`⚠️ ${autorContact.pushname || autorContact.verifiedName || autorContact.name}, por favor, não flode! Você está temporariamente bloqueado(a) por ${SPAM_BLOCK_DURATION / 1000} segundos.`, null, { mentions: [autorContact] });
             return;
         }
+    }
+
+    // ✅ ADICIONADO: Sistema de comandos de debate (DEVE VIR ANTES da lógica geral)
+    if (msg.body.startsWith('!debate')) {
+        const debateCommand = require('./commands/debate');
+        await debateCommand.execute(client, msg);
+        return;
+    } 
+    else if (msg.body.startsWith('!votar ')) {
+        const votarCommand = require('./commands/votar');
+        await votarCommand.execute(client, msg);
+        return;
+    } 
+    else if (msg.body.startsWith('!resultados')) {
+        const resultadosCommand = require('./commands/resultados');
+        await resultadosCommand.execute(client, msg);
+        return;
     }
 
     // --- Lógica Específica para Grupos ---

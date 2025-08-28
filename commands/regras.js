@@ -22,6 +22,6 @@ Para comandos do bot digite *!help*.
 Para mais informações digite *!faq*.
 `;
         
-        await msg.reply(regrasMessage, null, { mentions: [autorId] });
+        await msg.reply(regrasMessage, null, { mentions: [autorId] }); //kkk
     }
 };

@@ -103,7 +103,7 @@ module.exports = {
                 await msg.reply(`✅ Voto registrado para o debatedor ${voto}!`);
             }
 
-            salvarDebates(debatesData);
+            salvarDebates(debatesData); //kjkj
 
         } catch (error) {
             console.error('Erro no comando votar:', error);
